@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Receipt</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:Arial;margin:30px}
+h2{text-align:center;margin:0}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid #ccc;padding:8px;text-align:left}
+.right{text-align:right}
+.note{text-align:center;margin-top:20px}
+@media print{button{display:none}}
+</style>
+</head>
+<body>
+<button onclick="window.print()">Print</button>
+<h2>{{ shop.name }}</h2>
+<p style="text-align:center">{{ shop.addr }}</p>
+
+<table>
+<tr><th>Customer</th><td>{{ e.customer }}</td><th>Phone</th><td>{{ e.phone }}</td></tr>
+<tr><th>Device</th><td>{{ e.type }} - {{ e.model }}</td><th>Status</th><td>{{ e.status }}</td></tr>
+<tr><th>Problem</th><td colspan="3">{{ e.problem }}</td></tr>
+<tr><th>Receive</th><td>{{ e.receive_date }}</td><th>Delivered</th><td>{{ e.return_date }}</td></tr>
+<tr><th>Out</th><td>{{ e.out_date or '' }}</td><th>In</th><td>{{ e.in_date or '' }}</td></tr>
+</table>
+
+<h3>Billing</h3>
+{% set b = e.bill or {} %}
+<table>
+<tr><th>Parts ({{ b.parts or '' }})</th><td class="right">{{ '%.2f'|format(b.parts_total or 0) }}</td></tr>
+<tr><th>Service Charge</th><td class="right">{{ '%.2f'|format(b.service_charge or 0) }}</td></tr>
+<tr><th>Other</th><td class="right">{{ '%.2f'|format(b.other or 0) }}</td></tr>
+<tr><th>Total</th><td class="right"><b>{{ '%.2f'|format((b.parts_total or 0)+(b.service_charge or 0)+(b.other or 0)) }}</b></td></tr>
+<tr><th>Payment Mode</th><td>{{ b.payment_mode or '' }}</td></tr>
+</table>
+
+<p class="note">Thank you for choosing {{ shop.name }}!</p>
+</body>
+</html>

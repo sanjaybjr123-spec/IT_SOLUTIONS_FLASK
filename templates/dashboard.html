@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% block content %}
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="text-muted">Today's Sales</div>
+      <div class="fs-3 fw-bold">₹ {{ '%.2f'|format(kp.today_sales) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="text-muted">Pending Devices</div>
+      <div class="fs-3 fw-bold">{{ kp.pending }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="text-muted">Overdue (>10 days)</div>
+      <div class="fs-3 fw-bold text-danger">{{ kp.overdue }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="text-muted">Ledger Balance (Net)</div>
+      <div class="fs-3 fw-bold">₹ {{ '%.2f'|format(kp.ledger_bal) }}</div>
+    </div>
+  </div>
+</div>
+<div class="card mt-3 p-3">
+  <h5 class="mb-2">Quick Actions</h5>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="/service" class="btn btn-primary">New Service Entry</a>
+    <a href="/sales" class="btn btn-success">Add Sale</a>
+    <a href="/ledger" class="btn btn-secondary">Ledger Entry</a>
+    <a href="/customers" class="btn btn-info">Add Customer</a>
+    <a href="/overdue" class="btn btn-warning">View Overdue</a>
+  </div>
+</div>
+{% endblock %}

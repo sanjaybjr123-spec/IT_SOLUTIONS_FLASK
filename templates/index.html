@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>IT SOLUTIONS</title>
+<style>
+body{font-family:sans-serif;background:#f5f7fa;margin:0;color:#1e293b}
+.container{max-width:1100px;margin:auto;padding:15px}
+h1{margin:0;color:#1d4ed8}
+.card{background:#fff;border-radius:10px;padding:15px;box-shadow:0 2px 10px rgba(0,0,0,0.1);margin-top:10px}
+input,textarea,select{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.col{flex:1 1 240px}
+button{padding:6px 10px;border:none;border-radius:6px;cursor:pointer}
+button.primary{background:#2563eb;color:#fff}
+button.small{background:#e2e8f0}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid #ddd;padding:6px;font-size:14px;text-align:left}
+th{background:#dbeafe}
+.badge{padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.b-ready{background:#bbf7d0}
+.b-reject{background:#fecaca;color:#b91c1c}
+.b-delivered{background:#c7d2fe}
+.b-in{background:#fde68a}
+.b-out{background:#bfdbfe}
+
+/* Bill Popup */
+#billPopup{
+ position:fixed;top:0;left:0;width:100%;height:100%;
+ background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;
+}
+#billCard{background:#fff;padding:20px;border-radius:10px;max-width:400px;width:90%;}
+</style>
+</head>
+<body>
+<div class="container">
+  <header style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <h1>IT SOLUTIONS</h1>
+      <small>GHATSILA COLLEGE ROAD</small>
+    </div>
+    <div>
+      <button id="refreshBtn" class="small">Refresh</button>
+    </div>
+  </header>
+
+  <div class="card">
+    <h3>New Device Entry</h3>
+    <div class="row">
+      <div class="col">
+        <label>Type</label>
+        <select id="type">
+          <option>Laptop</option><option>Printer</option><option>Other</option>
+        </select>
+      </div>
+      <div class="col"><label>Customer</label><input id="customer"></div>
+      <div class="col"><label>Phone</label><input id="phone"></div>
+      <div class="col"><label>Model / Serial</label><input id="model"></div>
+    </div>
+    <label>Problem</label><textarea id="problem" rows="2"></textarea>
+    <label>Receive Date (auto)</label>
+    <input id="receive_date" disabled>
+    <button class="primary" id="saveBtn">Save</button>
+  </div>
+
+  <div class="card">
+    <h3>Device List</h3>
+    <table id="tbl">
+      <thead><tr><th>#</th><th>Type</th><th>Customer</th><th>Phone</th><th>Model</th><th>Problem</th><th>Receive</th><th>Out</th><th>In</th><th>Return</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Bill popup -->
+<div id="billPopup">
+  <div id="billCard">
+    <h3>Billing Details</h3>
+    <label>Parts</label><input id="parts">
+    <label>Parts Amount</label><input id="parts_total" type="number">
+    <label>Service Charge</label><input id="service_charge" type="number">
+    <label>Other</label><input id="other" type="number">
+    <label>Payment Mode</label>
+    <select id="payment_mode"><option>Cash</option><option>Online</option><option>Card</option></select>
+    <div style="margin-top:10px;text-align:right">
+      <button id="billSave" class="primary">Save</button>
+      <button id="billCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function api(p,opt={}){const r=await fetch(p,opt);if(!r.ok)throw new Error(await r.text());return await r.json();}
+function now(){return new Date().toLocaleString();}
+const recv=document.getElementById('receive_date');recv.value=now();setInterval(()=>recv.value=now(),60000);
+
+document.getElementById('saveBtn').onclick=async()=>{
+  const d={type:document.getElementById('type').value,customer:document.getElementById('customer').value,
+  phone:document.getElementById('phone').value,model:document.getElementById('model').value,problem:document.getElementById('problem').value};
+  await fetch('/api/entries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  load();
+};
+
+async function load(){
+  const rows=await api('/api/entries');
+  const tb=document.querySelector('#tbl tbody');tb.innerHTML='';
+  rows.forEach((r,i)=>{
+    const badge=r.status==='Ready'?'<span class="badge b-ready">Ready</span>':
+      r.status==='Delivered'?'<span class="badge b-delivered">Delivered</span>':
+      r.status==='NOT DONE'?'<span class="badge b-reject">NOT DONE</span>':
+      r.status==='In'?'<span class="badge b-in">In</span>':
+      r.status==='Out'?'<span class="badge b-out">Out</span>':
+      `<span class="badge">${r.status}</span>`;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td>${r.type}</td><td>${r.customer}</td><td>${r.phone}</td>
+    <td>${r.model}</td><td>${r.problem}</td><td>${r.receive_date||''}</td><td>${r.out_date||''}</td>
+    <td>${r.in_date||''}</td><td>${r.return_date||''}</td><td>${badge}</td>
+    <td>
+      <button class="small" onclick="act(${r.id},'out')">Out</button>
+      <button class="small" onclick="act(${r.id},'in')">In</button>
+      <button class="small" onclick="act(${r.id},'ready')">Ready</button>
+      <button class="small" onclick="act(${r.id},'delivered')">Delivered</button>
+      <button class="small" style="background:#fecaca" onclick="act(${r.id},'reject')">Reject</button>
+      <button class="small" onclick="openBill(${r.id})">Bill</button>
+      <button class="small" onclick="window.open('/print/${r.id}','_blank')">Print</button>
+      <button class="small" onclick="delE(${r.id})">Delete</button>
+    </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function act(id,a){await fetch(`/api/entries/${id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})});load();}
+async function delE(id){if(confirm('Delete this record?')){await fetch(`/api/entries/${id}`,{method:'DELETE'});load();}}
+document.getElementById('refreshBtn').onclick=load;
+
+// BILL FORM
+let billId=null;
+function openBill(id){billId=id;document.getElementById('billPopup').style.display='flex';}
+document.getElementById('billCancel').onclick=()=>document.getElementById('billPopup').style.display='none';
+document.getElementById('billSave').onclick=async()=>{
+ const d={parts:parts.value,parts_total:parts_total.value,service_charge:service_charge.value,other:other.value,payment_mode:payment_mode.value};
+ await fetch(`/api/entries/${billId}/bill`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+ document.getElementById('billPopup').style.display='none';
+ load();
+};
+
+load();
+</script>
+</body>
+</html>

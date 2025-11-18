@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% block content %}
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card p-3">
+      <h5>Add Sale</h5>
+      <form method="post">
+        <label class="form-label">Item</label><input name="item" class="form-control" required>
+        <div class="row g-2 mt-1">
+          <div class="col"><label class="form-label">Qty</label><input name="qty" type="number" step="0.01" class="form-control" required></div>
+          <div class="col"><label class="form-label">Rate</label><input name="rate" type="number" step="0.01" class="form-control" required></div>
+        </div>
+        <label class="form-label mt-1">Payment</label>
+        <select name="payment" class="form-select"><option>Cash</option><option>Online</option><option>Card</option></select>
+        <label class="form-label mt-1">Note</label><input name="note" class="form-control">
+        <button class="btn btn-success mt-2 w-100">Save</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card p-3">
+      <div class="d-flex justify-content-between">
+        <h5 class="mb-0">Sales List</h5>
+        <div class="fw-bold">Total: ₹ {{ '%.2f'|format(total) }}</div>
+      </div>
+      <div class="table-responsive mt-2">
+        <table class="table table-sm">
+          <thead class="table-success"><tr><th>#</th><th>Date/Time</th><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th><th>Payment</th><th>Note</th></tr></thead>
+          <tbody>
+            {% for r in rows %}
+            <tr><td>{{ loop.index }}</td><td>{{ r['sale_date'] }}</td><td>{{ r['item'] }}</td><td>{{ r['qty'] }}</td><td>{{ r['rate'] }}</td><td>{{ r['amount'] }}</td><td>{{ r['payment_mode'] }}</td><td>{{ r['note'] }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

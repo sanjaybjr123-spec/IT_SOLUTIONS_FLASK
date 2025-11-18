@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block content %}
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card p-3">
+      <h5>Add Customer</h5>
+      <form method="post">
+        <label class="form-label">Name</label><input name="name" class="form-control" required>
+        <label class="form-label mt-1">Phone</label><input name="phone" class="form-control">
+        <label class="form-label mt-1">Address</label><input name="address" class="form-control">
+        <button class="btn btn-info mt-2 w-100">Save</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card p-3">
+      <h5>Customer List</h5>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead class="table-info"><tr><th>#</th><th>Name</th><th>Phone</th><th>Address</th></tr></thead>
+          <tbody>
+            {% for r in rows %}
+            <tr><td>{{ loop.index }}</td><td>{{ r['name'] }}</td><td>{{ r['phone'] }}</td><td>{{ r['address'] }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
