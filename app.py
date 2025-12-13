@@ -1,5 +1,6 @@
-from flask import Flask, render_template, request, jsonify, abort
-import os, json, datetime
+from flask import Flask, render_template, request, jsonify, abort, Response
+import os, json, datetime, csv
+from io import StringIO
 import psycopg2
 import psycopg2.extras
 
@@ -56,8 +57,7 @@ def init_db():
     cur.close()
     conn.close()
 
-# 🔥 IMPORTANT (Render fix)
-# App start hote hi DB init hoga
+# 🔥 Render fix
 init_db()
 
 def row_to_obj(r):
@@ -176,6 +176,41 @@ def do_action(eid):
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- RUN (local only) ----------------
+# ---------------- CSV EXPORT (OPTION 2) ----------------
+def export_csv(query, filename):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(query)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    si = StringIO()
+    writer = csv.writer(si)
+
+    if rows:
+        writer.writerow(rows[0].keys())
+        for r in rows:
+            writer.writerow(r.values())
+
+    return Response(
+        si.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment;filename={filename}"}
+    )
+
+@app.get("/export/entries")
+def export_entries():
+    return export_csv("SELECT * FROM entries ORDER BY id DESC", "entries.csv")
+
+@app.get("/export/sales")
+def export_sales():
+    return export_csv("SELECT * FROM sales ORDER BY id DESC", "sales.csv")
+
+@app.get("/export/customers")
+def export_customers():
+    return export_csv("SELECT * FROM customers ORDER BY id DESC", "customers.csv")
+
+# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
