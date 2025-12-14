@@ -103,7 +103,14 @@ function render(rows){
       <button class="btn btn-sm btn-outline-danger" onclick="act(${r.id},'reject')">Reject</button>  
       <button class="btn btn-sm btn-outline-primary" onclick="openBill(${r.id})">Bill</button>  
       <button class="btn btn-sm btn-outline-primary" onclick="window.open('/print/${r.id}','_blank')">Print</button>  
-      <button class="btn btn-sm btn-outline-dark" onclick="delE(${r.id})">Delete</button>  
+      <button class="btn btn-sm btn-outline-dark"
+${r.status === 'Delivered' && r.whatsapp ? `
+<a href="${r.whatsapp}" target="_blank"
+   class="btn btn-sm btn-success">
+   📲 WhatsApp
+</a>
+` : ''}
+ onclick="delE(${r.id})">Delete</button>
     </td>`;  
     tb.appendChild(tr);  
   });  
