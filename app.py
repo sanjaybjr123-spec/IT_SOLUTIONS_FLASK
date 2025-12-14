@@ -34,32 +34,13 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
             id SERIAL PRIMARY KEY,
-            type TEXT,
-            customer TEXT,
-            phone TEXT,
-            model TEXT,
-            problem TEXT,
+            type TEXT, customer TEXT, phone TEXT,
+            model TEXT, problem TEXT,
             receive_date TEXT,
-            out_date TEXT,
-            in_date TEXT,
-            ready_date TEXT,
-            return_date TEXT,
-            reject_date TEXT,
-            status TEXT,
+            out_date TEXT, in_date TEXT,
+            ready_date TEXT, return_date TEXT,
+            reject_date TEXT, status TEXT,
             bill_json TEXT
-        )
-        """)
-
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS sales(
-            id SERIAL PRIMARY KEY,
-            sale_date TEXT,
-            item TEXT,
-            qty REAL,
-            rate REAL,
-            amount REAL,
-            payment_mode TEXT,
-            note TEXT
         )
         """)
 
@@ -93,14 +74,6 @@ def login_required(fn):
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("login"))
-        return fn(*args, **kwargs)
-    return wrapper
-
-def admin_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if session.get("role") != "admin":
-            return jsonify({"error": "Admin only"}), 403
         return fn(*args, **kwargs)
     return wrapper
 
@@ -142,13 +115,7 @@ def row_to_obj(r):
         "model": r["model"],
         "problem": r["problem"],
         "receive_date": r["receive_date"],
-        "out_date": r["out_date"],
-        "in_date": r["in_date"],
-        "ready_date": r["ready_date"],
-        "return_date": r["return_date"],
-        "reject_date": r["reject_date"],
-        "status": r["status"],
-        "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
+        "status": r["status"]
     }
 
 # ---------------- DASHBOARD ----------------
@@ -158,14 +125,7 @@ def dashboard():
     conn = get_db()
     cur = conn.cursor()
 
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    cur.execute(
-        "SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s",
-        (today + "%",)
-    )
-    today_sales = cur.fetchone()["s"]
-
-    cur.execute("SELECT * FROM entries WHERE status!='Delivered' AND receive_date IS NOT NULL")
+    cur.execute("SELECT * FROM entries WHERE status!='Delivered'")
     rows = cur.fetchall()
 
     pending = len(rows)
@@ -184,7 +144,7 @@ def dashboard():
     conn.close()
 
     return render_template("dashboard.html", kp={
-        "today_sales": today_sales,
+        "today_sales": 0,
         "pending": pending,
         "overdue": overdue,
         "ledger_bal": 0
@@ -204,7 +164,7 @@ def overdue_page():
 # ---------------- API ----------------
 @app.get("/api/entries")
 @login_required
-def list_entries():
+def api_entries():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM entries ORDER BY id DESC")
@@ -213,52 +173,33 @@ def list_entries():
     conn.close()
     return jsonify([row_to_obj(r) for r in rows])
 
-@app.post("/api/entries")
+@app.get("/api/overdue")
 @login_required
-def add_entry():
-    d = request.get_json(force=True)
+def api_overdue():
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO entries(type,customer,phone,model,problem,receive_date,status)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
-    """, (
-        d.get("type",""),
-        d.get("customer",""),
-        d.get("phone",""),
-        d.get("model",""),
-        d.get("problem",""),
-        now(),
-        "Received"
-    ))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"ok": True})
-
-@app.route("/overdue")
-@login_required
-def overdue():
-    conn = get_db()
-    cur = conn.cursor()
-
-    limit_dt = (
-        datetime.datetime.now() - datetime.timedelta(days=10)
-    ).strftime("%Y-%m-%d %H:%M:%S")
 
     cur.execute("""
         SELECT * FROM entries
-        WHERE status != 'Delivered'
+        WHERE status!='Delivered'
         AND receive_date IS NOT NULL
-        AND receive_date < %s
-        ORDER BY receive_date ASC
-    """, (limit_dt,))
-
+    """)
     rows = cur.fetchall()
+
+    result = []
+    now_dt = datetime.datetime.now()
+
+    for r in rows:
+        try:
+            recv = datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")
+            if (now_dt - recv).days > 10:
+                result.append(row_to_obj(r))
+        except:
+            pass
+
     cur.close()
     conn.close()
-
-    return jsonify([row_to_obj(r) for r in rows])
+    return jsonify(result)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
