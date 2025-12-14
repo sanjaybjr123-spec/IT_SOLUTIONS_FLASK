@@ -1,38 +1,84 @@
-{% extends "base.html" %}{% block content %}
+{% extends "base.html" %}
+{% block content %}
+
+<!-- TOP BAR -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Dashboard</h4>
+
+  <!-- LOGOUT BUTTON -->
+  <a href="/logout"
+     class="btn btn-sm btn-danger">
+     Logout
+  </a>
+</div>
+
+<!-- KPI CARDS -->
 <div class="row g-3">
   <div class="col-md-3">
     <div class="card p-3">
       <div class="text-muted">Today's Sales</div>
-      <div class="fs-3 fw-bold">₹ {{ '%.2f'|format(kp.today_sales) }}</div>
+      <div class="fs-3 fw-bold">
+        ₹ {{ '%.2f'|format(kp.today_sales) }}
+      </div>
     </div>
   </div>
+
   <div class="col-md-3">
     <div class="card p-3">
       <div class="text-muted">Pending Devices</div>
-      <div class="fs-3 fw-bold">{{ kp.pending }}</div>
+      <div class="fs-3 fw-bold">
+        {{ kp.pending }}
+      </div>
     </div>
   </div>
+
   <div class="col-md-3">
     <div class="card p-3">
-      <div class="text-muted">Overdue (>10 days)</div>
-      <div class="fs-3 fw-bold text-danger">{{ kp.overdue }}</div>
+      <div class="text-muted">Overdue (&gt;10 days)</div>
+      <div class="fs-3 fw-bold text-danger">
+        {{ kp.overdue }}
+      </div>
     </div>
   </div>
+
   <div class="col-md-3">
     <div class="card p-3">
       <div class="text-muted">Ledger Balance (Net)</div>
-      <div class="fs-3 fw-bold">₹ {{ '%.2f'|format(kp.ledger_bal) }}</div>
+      <div class="fs-3 fw-bold">
+        ₹ {{ '%.2f'|format(kp.ledger_bal) }}
+      </div>
     </div>
   </div>
 </div>
+
+<!-- QUICK ACTIONS -->
 <div class="card mt-3 p-3">
   <h5 class="mb-2">Quick Actions</h5>
+
   <div class="d-flex flex-wrap gap-2">
-    <a href="/service" class="btn btn-primary">New Service Entry</a>
-    <a href="/sales" class="btn btn-success">Add Sale</a>
-    <a href="/ledger" class="btn btn-secondary">Ledger Entry</a>
-    <a href="/customers" class="btn btn-info">Add Customer</a>
-    <a href="/overdue" class="btn btn-warning">View Overdue</a>
+
+    <!-- COMMON FOR ADMIN + STAFF -->
+    <a href="/service" class="btn btn-primary">
+      New Service Entry
+    </a>
+
+    <!-- ADMIN ONLY BUTTONS -->
+    {% if session.role == 'admin' %}
+      <a href="/sales" class="btn btn-success">
+        Add Sale
+      </a>
+      <a href="/ledger" class="btn btn-secondary">
+        Ledger Entry
+      </a>
+      <a href="/customers" class="btn btn-info">
+        Add Customer
+      </a>
+      <a href="/overdue" class="btn btn-warning">
+        View Overdue
+      </a>
+    {% endif %}
+
   </div>
 </div>
+
 {% endblock %}
