@@ -232,6 +232,7 @@ def list_entries():
     rows = cur.fetchall()
     cur.close()
     conn.close()
+
     data = []
 
 for r in rows:
@@ -252,6 +253,7 @@ for r in rows:
     data.append(obj)
 
 return jsonify(data)
+
 @app.post("/api/entries")
 @login_required
 def add_entry():
