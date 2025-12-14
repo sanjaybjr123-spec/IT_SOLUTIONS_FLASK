@@ -148,6 +148,24 @@ def row_to_obj(r):
         "status": r["status"],
         "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
     }
+import urllib.parse
+
+def whatsapp_bill_link(entry, total):
+    msg = f"""
+🧾 *IT SOLUTIONS*
+
+Customer: {entry['customer']}
+Phone: {entry['phone']}
+Model: {entry['model']}
+Problem: {entry['problem']}
+
+💰 *Total Bill:* ₹{total}
+
+🙏 Thank you for choosing us!
+"""
+    text = urllib.parse.quote(msg)
+    phone = entry["phone"].replace("+","").replace(" ","")
+    return f"https://wa.me/91{phone}?text={text}"
 
 # ---------------- EXPORT ----------------
 @app.get("/export/entries")
