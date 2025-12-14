@@ -1,11 +1,14 @@
-from flask import Flask, render_template, request, jsonify, abort, Response
+from flask import Flask, render_template, request, jsonify, abort, Response, session, redirect, url_for
 import os, json, datetime, csv
 from io import StringIO
 import psycopg2
 import psycopg2.extras
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 
 # ---------------- APP ----------------
 app = Flask(__name__, template_folder="templates")
+app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
 
 def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -27,15 +30,11 @@ def init_db():
         conn = get_db()
         cur = conn.cursor()
 
-        # main table
+        # entries
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
           id SERIAL PRIMARY KEY,
-          type TEXT,
-          customer TEXT,
-          phone TEXT,
-          model TEXT,
-          problem TEXT,
+          type TEXT, customer TEXT, phone TEXT, model TEXT, problem TEXT,
           receive_date TEXT,
           out_date TEXT,
           in_date TEXT,
@@ -47,35 +46,36 @@ def init_db():
         )
         """)
 
-        # auto add missing columns (SAFE)
-        cur.execute("ALTER TABLE entries ADD COLUMN IF NOT EXISTS out_date TEXT")
-        cur.execute("ALTER TABLE entries ADD COLUMN IF NOT EXISTS in_date TEXT")
-        cur.execute("ALTER TABLE entries ADD COLUMN IF NOT EXISTS ready_date TEXT")
-        cur.execute("ALTER TABLE entries ADD COLUMN IF NOT EXISTS reject_date TEXT")
-
         # sales
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
           id SERIAL PRIMARY KEY,
-          sale_date TEXT,
-          item TEXT,
-          qty REAL,
-          rate REAL,
-          amount REAL,
-          payment_mode TEXT,
-          note TEXT
+          sale_date TEXT, item TEXT, qty REAL, rate REAL,
+          amount REAL, payment_mode TEXT, note TEXT
         )
         """)
 
-        # customers
+        # users
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS customers(
+        CREATE TABLE IF NOT EXISTS users(
           id SERIAL PRIMARY KEY,
-          name TEXT,
-          phone TEXT,
-          address TEXT
+          username TEXT UNIQUE,
+          password_hash TEXT,
+          role TEXT
         )
         """)
+
+        # create default admin if none
+        cur.execute("SELECT COUNT(*) AS c FROM users")
+        if cur.fetchone()["c"] == 0:
+            cur.execute("""
+                INSERT INTO users(username, password_hash, role)
+                VALUES (%s,%s,%s)
+            """, (
+                "admin",
+                generate_password_hash("admin@123"),
+                "admin"
+            ))
 
         conn.commit()
         cur.close()
@@ -84,6 +84,51 @@ def init_db():
         print("DB init skipped:", e)
 
 init_db()
+
+# ---------------- AUTH HELPERS ----------------
+def login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        return fn(*args, **kwargs)
+    return wrapper
+
+def admin_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if session.get("role") != "admin":
+            return jsonify({"error": "Admin only"}), 403
+        return fn(*args, **kwargs)
+    return wrapper
+
+# ---------------- LOGIN ----------------
+@app.route("/login", methods=["GET","POST"])
+def login():
+    if request.method == "POST":
+        u = request.form.get("username")
+        p = request.form.get("password")
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE username=%s", (u,))
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if user and check_password_hash(user["password_hash"], p):
+            session["user_id"] = user["id"]
+            session["role"] = user["role"]
+            return redirect(url_for("dashboard"))
+
+        return render_template("login.html", error="Invalid username or password")
+
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 # ---------------- HELPERS ----------------
 def row_to_obj(r):
@@ -95,26 +140,24 @@ def row_to_obj(r):
         "model": r["model"],
         "problem": r["problem"],
         "receive_date": r["receive_date"],
-        "out_date": r.get("out_date"),
-        "in_date": r.get("in_date"),
-        "ready_date": r.get("ready_date"),
-        "return_date": r.get("return_date"),
-        "reject_date": r.get("reject_date"),
+        "out_date": r["out_date"],
+        "in_date": r["in_date"],
+        "ready_date": r["ready_date"],
+        "return_date": r["return_date"],
+        "reject_date": r["reject_date"],
         "status": r["status"],
         "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
     }
 
 # ---------------- DASHBOARD ----------------
 @app.route("/")
+@login_required
 def dashboard():
     conn = get_db()
     cur = conn.cursor()
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    cur.execute(
-        "SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s",
-        (today + "%",)
-    )
+    cur.execute("SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s", (today+"%",))
     today_sales = cur.fetchone()["s"]
 
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
@@ -132,10 +175,12 @@ def dashboard():
 
 # ---------------- SERVICE ----------------
 @app.route("/service")
+@login_required
 def service_page():
     return render_template("service.html")
 
 @app.get("/api/entries")
+@login_required
 def list_entries():
     conn = get_db()
     cur = conn.cursor()
@@ -146,6 +191,7 @@ def list_entries():
     return jsonify([row_to_obj(r) for r in rows])
 
 @app.post("/api/entries")
+@login_required
 def add_entry():
     d = request.get_json(force=True)
     conn = get_db()
@@ -167,55 +213,40 @@ def add_entry():
     conn.commit()
     cur.close()
     conn.close()
-    return jsonify({"ok": True}), 201
+    return jsonify({"ok": True})
 
-# ---------------- ENTRY ACTIONS (FINAL FIX) ----------------
+# ---------------- ENTRY ACTIONS ----------------
 @app.post("/api/entries/<int:eid>/action")
+@login_required
 def entry_action(eid):
     d = request.get_json(force=True)
-    action = d.get("action")
+    a = d.get("action")
     t = now()
 
     conn = get_db()
     cur = conn.cursor()
 
-    if action == "out":
-        cur.execute(
-            "UPDATE entries SET status='Out', out_date=%s WHERE id=%s",
-            (t, eid)
-        )
-    elif action == "in":
-        cur.execute(
-            "UPDATE entries SET status='In', in_date=%s WHERE id=%s",
-            (t, eid)
-        )
-    elif action == "ready":
-        cur.execute(
-            "UPDATE entries SET status='Ready', ready_date=%s WHERE id=%s",
-            (t, eid)
-        )
-    elif action == "delivered":
-        cur.execute(
-            "UPDATE entries SET status='Delivered', return_date=%s WHERE id=%s",
-            (t, eid)
-        )
-    elif action == "reject":
-        cur.execute(
-            "UPDATE entries SET status='Rejected', reject_date=%s WHERE id=%s",
-            (t, eid)
-        )
+    if a == "out":
+        cur.execute("UPDATE entries SET status='Out', out_date=%s WHERE id=%s", (t,eid))
+    elif a == "in":
+        cur.execute("UPDATE entries SET status='In', in_date=%s WHERE id=%s", (t,eid))
+    elif a == "ready":
+        cur.execute("UPDATE entries SET status='Ready', ready_date=%s WHERE id=%s", (t,eid))
+    elif a == "delivered":
+        cur.execute("UPDATE entries SET status='Delivered', return_date=%s WHERE id=%s", (t,eid))
+    elif a == "reject":
+        cur.execute("UPDATE entries SET status='Rejected', reject_date=%s WHERE id=%s", (t,eid))
     else:
-        cur.close()
-        conn.close()
-        return jsonify({"error": "Invalid action"}), 400
+        return jsonify({"error":"Invalid action"}),400
 
     conn.commit()
     cur.close()
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- SAVE BILL ----------------
+# ---------------- BILL ----------------
 @app.post("/api/entries/<int:eid>/bill")
+@login_required
 def save_bill(eid):
     d = request.get_json(force=True)
 
@@ -224,7 +255,7 @@ def save_bill(eid):
         "parts_total": float(d.get("parts_total") or 0),
         "service_charge": float(d.get("service_charge") or 0),
         "other": float(d.get("other") or 0),
-        "payment_mode": d.get("payment_mode","Cash")  # Cash / UPI / Card
+        "payment_mode": d.get("payment_mode","Cash")
     }
 
     total = bill["parts_total"] + bill["service_charge"] + bill["other"]
@@ -232,31 +263,21 @@ def save_bill(eid):
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute(
-        "UPDATE entries SET bill_json=%s WHERE id=%s",
-        (json.dumps(bill), eid)
-    )
-
+    cur.execute("UPDATE entries SET bill_json=%s WHERE id=%s", (json.dumps(bill), eid))
     cur.execute("""
         INSERT INTO sales(sale_date,item,qty,rate,amount,payment_mode,note)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
-    """, (
-        now(),
-        "Service Bill",
-        1,
-        total,
-        total,
-        bill["payment_mode"],
-        f"Entry ID {eid}"
-    ))
+    """, (now(),"Service Bill",1,total,total,bill["payment_mode"],f"Entry {eid}"))
 
     conn.commit()
     cur.close()
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- DELETE ----------------
+# ---------------- DELETE (ADMIN ONLY) ----------------
 @app.delete("/api/entries/<int:eid>")
+@login_required
+@admin_required
 def delete_entry(eid):
     conn = get_db()
     cur = conn.cursor()
@@ -268,6 +289,7 @@ def delete_entry(eid):
 
 # ---------------- PRINT ----------------
 @app.get("/print/<int:eid>")
+@login_required
 def print_receipt(eid):
     conn = get_db()
     cur = conn.cursor()
@@ -275,14 +297,11 @@ def print_receipt(eid):
     r = cur.fetchone()
     cur.close()
     conn.close()
-
     if not r:
         abort(404)
 
-    return render_template(
-        "receipt.html",
-        e=row_to_obj(r),
-        shop={"name": "IT SOLUTIONS", "addr": "GHATSILA COLLEGE ROAD"}
+    return render_template("receipt.html", e=row_to_obj(r),
+        shop={"name":"IT SOLUTIONS","addr":"GHATSILA COLLEGE ROAD"}
     )
 
 # ---------------- RUN ----------------
