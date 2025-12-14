@@ -38,7 +38,8 @@ def init_db():
         ready_date TEXT,
         reject_date TEXT,
         delivered_date TEXT,
-        status TEXT
+        status TEXT,
+        amount REAL DEFAULT 0
     )
     """)
 
@@ -86,6 +87,7 @@ def login():
 
         if u and check_password_hash(u["password_hash"], request.form["password"]):
             session["user_id"] = u["id"]
+            session["role"] = u["role"]
             return redirect("/")
         return render_template("login.html", error="Invalid Login")
 
@@ -98,7 +100,17 @@ def logout():
 
 # ---------------- HELPERS ----------------
 def row_to_obj(r):
-    return dict(r)
+    return {
+        "id": r["id"],
+        "type": r["type"],
+        "customer": r["customer"],
+        "phone": r["phone"],
+        "model": r["model"],
+        "problem": r["problem"],
+        "receive_date": r["receive_date"],
+        "status": r["status"],
+        "amount": r.get("amount", 0)
+    }
 
 # ---------------- DASHBOARD ----------------
 @app.route("/")
@@ -151,8 +163,8 @@ def add_entry():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO entries(type,customer,phone,model,problem,receive_date,status)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        INSERT INTO entries(type,customer,phone,model,problem,receive_date,status,amount)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
     """, (
         d.get("type",""),
         d.get("customer",""),
@@ -160,7 +172,8 @@ def add_entry():
         d.get("model",""),
         d.get("problem",""),
         now(),
-        "Received"
+        "Received",
+        float(d.get("amount", 0))
     ))
     conn.commit()
     cur.close()
@@ -179,7 +192,7 @@ def api_entries():
     conn.close()
     return jsonify([row_to_obj(r) for r in rows])
 
-# STATUS ACTIONS (IN / OUT / READY / REJECT / DELIVERED)
+# STATUS ACTIONS
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
@@ -196,7 +209,7 @@ def entry_action(eid):
     }
 
     if action not in mapping:
-        return jsonify({"error":"Invalid action"}), 400
+        return jsonify({"error": "Invalid action"}), 400
 
     status, field = mapping[action]
 
@@ -211,7 +224,7 @@ def entry_action(eid):
     conn.close()
     return jsonify({"ok": True})
 
-# DELETE ENTRY
+# DELETE
 @app.delete("/api/entries/<int:eid>")
 @login_required
 def delete_entry(eid):
@@ -223,7 +236,7 @@ def delete_entry(eid):
     conn.close()
     return jsonify({"deleted": True})
 
-# OVERDUE API
+# OVERDUE
 @app.get("/api/overdue")
 @login_required
 def api_overdue():
@@ -246,7 +259,7 @@ def api_overdue():
             pass
     return jsonify(res)
 
-# ---------------- PRINT RECEIPT (FIXED) ----------------
+# ---------------- PRINT ----------------
 @app.route("/print/<int:eid>")
 @login_required
 def print_receipt(eid):
