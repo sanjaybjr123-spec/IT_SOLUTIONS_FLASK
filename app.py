@@ -82,7 +82,6 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-
     except Exception as e:
         print("DB init skipped:", e)
 
@@ -166,19 +165,13 @@ def dashboard():
     )
     today_sales = cur.fetchone()["s"]
 
-    cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
-    pending = cur.fetchone()["n"]
-
-    # OVERDUE COUNT (10 DAYS)
-    cur.execute("""
-        SELECT * FROM entries
-        WHERE status!='Delivered'
-        AND receive_date IS NOT NULL
-    """)
+    cur.execute("SELECT * FROM entries WHERE status!='Delivered' AND receive_date IS NOT NULL")
     rows = cur.fetchall()
 
+    pending = len(rows)
     overdue = 0
     now_dt = datetime.datetime.now()
+
     for r in rows:
         try:
             recv = datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")
@@ -197,7 +190,18 @@ def dashboard():
         "ledger_bal": 0
     })
 
-# ---------------- SERVICE ----------------
+# ---------------- PAGES ----------------
+@app.route("/service")
+@login_required
+def service_page():
+    return render_template("service.html")
+
+@app.route("/overdue")
+@login_required
+def overdue_page():
+    return render_template("overdue.html")
+
+# ---------------- API ----------------
 @app.get("/api/entries")
 @login_required
 def list_entries():
@@ -215,7 +219,6 @@ def add_entry():
     d = request.get_json(force=True)
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("""
         INSERT INTO entries(type,customer,phone,model,problem,receive_date,status)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
@@ -228,45 +231,11 @@ def add_entry():
         now(),
         "Received"
     ))
-
     conn.commit()
     cur.close()
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- ENTRY ACTIONS ----------------
-@app.post("/api/entries/<int:eid>/action")
-@login_required
-def entry_action(eid):
-    d = request.get_json(force=True)
-    a = d.get("action")
-    t = now()
-
-    mapping = {
-        "out": ("Out", "out_date"),
-        "in": ("In", "in_date"),
-        "ready": ("Ready", "ready_date"),
-        "delivered": ("Delivered", "return_date"),
-        "reject": ("Rejected", "reject_date")
-    }
-
-    if a not in mapping:
-        return jsonify({"error":"Invalid action"}),400
-
-    status, field = mapping[a]
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        f"UPDATE entries SET status=%s, {field}=%s WHERE id=%s",
-        (status, t, eid)
-    )
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"ok": True})
-
-# ---------------- OVERDUE PAGE ----------------
 @app.route("/api/overdue")
 @login_required
 def api_overdue():
@@ -290,48 +259,6 @@ def api_overdue():
     conn.close()
 
     return jsonify([row_to_obj(r) for r in rows])
-
-# ---------------- DELETE ----------------
-@app.delete("/api/entries/<int:eid>")
-@login_required
-@admin_required
-def delete_entry(eid):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM entries WHERE id=%s", (eid,))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"deleted": True})
-
-# ---------------- EXPORT ----------------
-def export_csv(query, filename):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(query)
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    si = StringIO()
-    writer = csv.writer(si)
-
-    if rows:
-        writer.writerow(rows[0].keys())
-        for r in rows:
-            writer.writerow(r.values())
-
-    return Response(
-        si.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
-
-@app.get("/export/entries")
-@login_required
-@admin_required
-def export_entries():
-    return export_csv("SELECT * FROM entries ORDER BY id DESC", "entries_backup.csv")
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
