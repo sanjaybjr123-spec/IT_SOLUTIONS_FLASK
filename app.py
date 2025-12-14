@@ -267,20 +267,13 @@ def entry_action(eid):
     return jsonify({"ok": True})
 
 # ---------------- OVERDUE PAGE ----------------
-@app.route("/overdue")
-@login_required
-def overdue_page():
-    return render_template("overdue.html")
-
-# ---------------- OVERDUE API (MAIN FIX) ----------------
-@app.get("/api/overdue")
+@app.route("/api/overdue")
 @login_required
 def api_overdue():
     conn = get_db()
     cur = conn.cursor()
 
-    # 10 days se zyada purane aur Delivered nahi
-    limit_date = (
+    limit_dt = (
         datetime.datetime.now() - datetime.timedelta(days=10)
     ).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -290,14 +283,13 @@ def api_overdue():
         AND receive_date IS NOT NULL
         AND receive_date < %s
         ORDER BY receive_date ASC
-    """, (limit_date,))
+    """, (limit_dt,))
 
     rows = cur.fetchall()
     cur.close()
     conn.close()
 
     return jsonify([row_to_obj(r) for r in rows])
-    
 
 # ---------------- DELETE ----------------
 @app.delete("/api/entries/<int:eid>")
