@@ -1,5 +1,5 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-import os, datetime
+from flask import Flask, render_template, request, jsonify, session, redirect
+import os, datetime, json
 import psycopg2, psycopg2.extras
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
@@ -18,7 +18,7 @@ def get_db():
         cursor_factory=psycopg2.extras.RealDictCursor
     )
 
-# ---------------- AUTO DB FIX (NO SQL NEEDED) ----------------
+# ---------------- AUTO DB MIGRATION ----------------
 def init_db():
     conn = get_db()
     cur = conn.cursor()
@@ -36,23 +36,20 @@ def init_db():
     )
     """)
 
-    # 🔥 AUTO ADD MISSING COLUMNS
-    auto_cols = [
+    # auto add missing columns (SAFE)
+    cols = [
         "ALTER TABLE entries ADD COLUMN IF NOT EXISTS out_date TEXT",
         "ALTER TABLE entries ADD COLUMN IF NOT EXISTS in_date TEXT",
         "ALTER TABLE entries ADD COLUMN IF NOT EXISTS ready_date TEXT",
         "ALTER TABLE entries ADD COLUMN IF NOT EXISTS reject_date TEXT",
         "ALTER TABLE entries ADD COLUMN IF NOT EXISTS delivered_date TEXT",
-        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS amount REAL DEFAULT 0"
+        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS amount REAL DEFAULT 0",
+        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS bill_json TEXT"
     ]
+    for q in cols:
+        try: cur.execute(q)
+        except: pass
 
-    for q in auto_cols:
-        try:
-            cur.execute(q)
-        except:
-            pass
-
-    # users table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id SERIAL PRIMARY KEY,
@@ -143,6 +140,8 @@ def overdue_page():
     return render_template("overdue.html")
 
 # ---------------- API ----------------
+
+# ADD ENTRY
 @app.post("/api/entries")
 @login_required
 def add_entry():
@@ -167,6 +166,7 @@ def add_entry():
     cur.close(); conn.close()
     return jsonify(ok=True)
 
+# LIST
 @app.get("/api/entries")
 @login_required
 def api_entries():
@@ -177,7 +177,7 @@ def api_entries():
     cur.close(); conn.close()
     return jsonify(rows)
 
-# ✅ DELIVERED FIXED
+# STATUS + TIMESTAMP (FINAL FIX)
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
@@ -207,24 +207,66 @@ def entry_action(eid):
     cur.close(); conn.close()
     return jsonify(ok=True)
 
-# ---------------- PRINT (FIXED) ----------------
+# DELETE (FIXED)
+@app.delete("/api/entries/<int:eid>")
+@login_required
+def delete_entry(eid):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM entries WHERE id=%s", (eid,))
+    conn.commit()
+    cur.close(); conn.close()
+    return jsonify(ok=True)
+
+# BILL SAVE (SAFE – popup error nahi aayega)
+@app.post("/api/entries/<int:eid>/bill")
+@login_required
+def save_bill(eid):
+    d = request.get_json(force=True)
+
+    parts_total = float(d.get("parts_total",0))
+    service_charge = float(d.get("service_charge",0))
+    other = float(d.get("other",0))
+    total = parts_total + service_charge + other
+
+    bill = {
+        "parts": d.get("parts",""),
+        "parts_total": parts_total,
+        "service_charge": service_charge,
+        "other": other,
+        "payment_mode": d.get("payment_mode","Cash"),
+        "total": total
+    }
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE entries SET amount=%s, bill_json=%s WHERE id=%s",
+        (total, json.dumps(bill), eid)
+    )
+    conn.commit()
+    cur.close(); conn.close()
+    return jsonify(ok=True)
+
+# PRINT (NO INTERNAL ERROR)
 @app.route("/print/<int:eid>")
 @login_required
 def print_receipt(eid):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT *,
-        COALESCE(amount,0) AS amount
-        FROM entries WHERE id=%s
-    """, (eid,))
+    cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
     r = cur.fetchone()
     cur.close(); conn.close()
 
     if not r:
         return "Not found", 404
 
-    return render_template("receipt.html", e=r)
+    bill = {}
+    if r.get("bill_json"):
+        try: bill = json.loads(r["bill_json"])
+        except: pass
+
+    return render_template("receipt.html", e=r, bill=bill)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
