@@ -180,8 +180,16 @@ async function delE(id){
   }
 }
 
-function openBill(id){ billForId=id; document.getElementById('billModal').style.display='block'; }
-function closeBill(){ document.getElementById('billModal').style.display='none'; }
+function openBill(id){
+  billForId = id;
+  const modal = document.getElementById('billModal');
+  modal.classList.add('show');
+}
+
+function closeBill(){
+  const modal = document.getElementById('billModal');
+  modal.classList.remove('show');
+}
 async function saveBill(){
   const d={parts:parts.value,parts_total:parts_total.value,service_charge:service_charge.value,other:other.value,payment_mode:payment_mode.value};
   await fetch(`/api/entries/${billForId}/bill`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
