@@ -1,50 +1,60 @@
 <script>
-async function api(p,opt={}) {
-  const r = await fetch(p,opt);
-  if(!r.ok) throw new Error(await r.text());
+async function api(url) {
+  const r = await fetch(url);
+  if (!r.ok) {
+    throw new Error("API Error");
+  }
   return await r.json();
 }
 
-function parseDate(s){
-  // "2025-12-14 04:39:23" → "2025-12-14T04:39:23"
-  return new Date(s.replace(' ', 'T'));
-}
+async function load() {
+  try {
+    // ✅ SERVER-SIDE OVERDUE DATA
+    const rows = await api('/api/overdue');
 
-async function load(){
-  const rows = await api('/api/entries');
-  const now = new Date();
+    const tb = document.querySelector('#tbl tbody');
+    tb.innerHTML = '';
 
-  const od = rows.filter(r => {
-    if(r.status === "Delivered" || !r.receive_date) return false;
-    const recv = parseDate(r.receive_date);
-    if(isNaN(recv)) return false;
-    const days = (now - recv) / (1000*60*60*24);
-    return days > 10;
-  });
+    if (rows.length === 0) {
+      tb.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center text-muted">
+            No overdue devices 🎉
+          </td>
+        </tr>
+      `;
+      return;
+    }
 
-  const tb = document.querySelector('#tbl tbody');
-  tb.innerHTML = '';
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${r.type || ''}</td>
+        <td>${r.customer || ''}</td>
+        <td>${r.phone || ''}</td>
+        <td>${r.model || ''}</td>
+        <td>${r.problem || ''}</td>
+        <td>${r.receive_date || ''}</td>
+        <td>
+          <span class="badge bg-danger">
+            ${r.status}
+          </span>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-primary"
+            onclick="window.open('/print/${r.id}','_blank')">
+            Print
+          </button>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
 
-  od.forEach((r,i)=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${i+1}</td>
-      <td>${r.type}</td>
-      <td>${r.customer}</td>
-      <td>${r.phone}</td>
-      <td>${r.model}</td>
-      <td>${r.problem}</td>
-      <td>${r.receive_date}</td>
-      <td><span class="badge bg-danger">${r.status}</span></td>
-      <td>
-        <button class="btn btn-sm btn-primary"
-          onclick="window.open('/print/${r.id}','_blank')">
-          Print
-        </button>
-      </td>
-    `;
-    tb.appendChild(tr);
-  });
+  } catch (e) {
+    alert("Failed to load overdue list");
+    console.error(e);
+  }
 }
 
 load();
