@@ -30,23 +30,39 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
           id SERIAL PRIMARY KEY,
-          type TEXT, customer TEXT, phone TEXT, model TEXT, problem TEXT,
-          receive_date TEXT, return_date TEXT,
-          status TEXT, bill_json TEXT
-        )""")
+          type TEXT,
+          customer TEXT,
+          phone TEXT,
+          model TEXT,
+          problem TEXT,
+          receive_date TEXT,
+          return_date TEXT,
+          status TEXT,
+          bill_json TEXT
+        )
+        """)
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
           id SERIAL PRIMARY KEY,
-          sale_date TEXT, item TEXT, qty REAL, rate REAL, amount REAL,
-          payment_mode TEXT, note TEXT
-        )""")
+          sale_date TEXT,
+          item TEXT,
+          qty REAL,
+          rate REAL,
+          amount REAL,
+          payment_mode TEXT,
+          note TEXT
+        )
+        """)
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS customers(
           id SERIAL PRIMARY KEY,
-          name TEXT, phone TEXT, address TEXT
-        )""")
+          name TEXT,
+          phone TEXT,
+          address TEXT
+        )
+        """)
 
         conn.commit()
         cur.close()
@@ -54,6 +70,7 @@ def init_db():
     except Exception as e:
         print("DB init skipped:", e)
 
+# safe init
 init_db()
 
 # ---------------- HELPERS ----------------
@@ -139,7 +156,7 @@ def add_entry():
     conn.close()
     return jsonify({"ok": True}), 201
 
-# ---------------- SAVE BILL (CASH / UPI / CARD) ----------------
+# ---------------- SAVE BILL (Cash / UPI / Card) ----------------
 @app.post("/api/entries/<int:eid>/bill")
 def save_bill(eid):
     d = request.get_json(force=True)
@@ -149,20 +166,56 @@ def save_bill(eid):
         "parts_total": float(d.get("parts_total") or 0),
         "service_charge": float(d.get("service_charge") or 0),
         "other": float(d.get("other") or 0),
-        "payment_mode": d.get("payment_mode","Cash")  # Cash / UPI / Card
+        "payment_mode": d.get("payment_mode","Cash")
     }
+
+    total_amount = (
+        bill["parts_total"] +
+        bill["service_charge"] +
+        bill["other"]
+    )
 
     conn = get_db()
     cur = conn.cursor()
+
+    # save bill
     cur.execute(
         "UPDATE entries SET bill_json=%s WHERE id=%s",
         (json.dumps(bill), eid)
     )
+
+    # save into sales table
+    cur.execute("""
+        INSERT INTO sales(sale_date,item,qty,rate,amount,payment_mode,note)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """, (
+        now(),
+        "Service Bill",
+        1,
+        total_amount,
+        total_amount,
+        bill["payment_mode"],
+        f"Entry ID {eid}"
+    ))
+
     conn.commit()
     cur.close()
     conn.close()
 
     return jsonify({"ok": True})
+
+# ---------------- DELETE ENTRY (FIXED) ----------------
+@app.delete("/api/entries/<int:eid>")
+def delete_entry(eid):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM entries WHERE id=%s", (eid,))
+    conn.commit()
+
+    cur.close()
+    conn.close()
+    return jsonify({"deleted": True})
 
 # ---------------- PRINT RECEIPT ----------------
 @app.get("/print/<int:eid>")
