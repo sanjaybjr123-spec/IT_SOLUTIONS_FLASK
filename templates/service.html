@@ -93,7 +93,7 @@ function render(rows){
     const tr=document.createElement('tr'); tr.className=od;  
     tr.innerHTML=`<td>${i+1}</td><td>${r.type||''}</td><td>${r.customer||''}</td><td>${r.phone||''}</td>  
     <td>${r.model||''}</td><td>${r.problem||''}</td>  
-    <td>${r.receive_date||''}</td><td>${r.out_date||''}</td><td>${r.in_date||''}</td><td>${r.delivered_date||''}</td>  
+    <td>${r.receive_date||''}</td><td>${r.out_date||''}</td><td>${r.in_date||''}</td><td>${r.return_date||''}</td>  
     <td><span class="${fmtBadge(r.status||'')}">${r.status||''}</span></td>  
     <td class="text-nowrap">  
       <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'out')">Out</button>  
