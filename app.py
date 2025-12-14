@@ -1,8 +1,6 @@
-from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
-import os, json, datetime, csv
-from io import StringIO
-import psycopg2
-import psycopg2.extras
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+import os, json, datetime
+import psycopg2, psycopg2.extras
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
@@ -15,108 +13,87 @@ def now():
 
 # ---------------- DATABASE ----------------
 def get_db():
-    DATABASE_URL = os.environ.get("DATABASE_URL")
-    if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL not set")
-
     return psycopg2.connect(
-        DATABASE_URL,
+        os.environ["DATABASE_URL"],
         sslmode="require",
         cursor_factory=psycopg2.extras.RealDictCursor
     )
 
 # ---------------- INIT DB ----------------
 def init_db():
-    try:
-        conn = get_db()
-        cur = conn.cursor()
+    conn = get_db()
+    cur = conn.cursor()
 
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS entries(
-            id SERIAL PRIMARY KEY,
-            type TEXT, customer TEXT, phone TEXT,
-            model TEXT, problem TEXT,
-            receive_date TEXT,
-            out_date TEXT, in_date TEXT,
-            ready_date TEXT, return_date TEXT,
-            reject_date TEXT, status TEXT,
-            bill_json TEXT
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS entries(
+        id SERIAL PRIMARY KEY,
+        type TEXT,
+        customer TEXT,
+        phone TEXT,
+        model TEXT,
+        problem TEXT,
+        receive_date TEXT,
+        status TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        password_hash TEXT,
+        role TEXT
+    )
+    """)
+
+    cur.execute("SELECT COUNT(*) c FROM users")
+    if cur.fetchone()["c"] == 0:
+        cur.execute(
+            "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
+            ("admin", generate_password_hash("admin@123"), "admin")
         )
-        """)
 
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS users(
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE,
-            password_hash TEXT,
-            role TEXT
-        )
-        """)
-
-        cur.execute("SELECT COUNT(*) c FROM users")
-        if cur.fetchone()["c"] == 0:
-            cur.execute(
-                "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
-                ("admin", generate_password_hash("admin@123"), "admin")
-            )
-
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Exception as e:
-        print("DB init skipped:", e)
+    conn.commit()
+    cur.close()
+    conn.close()
 
 init_db()
 
 # ---------------- AUTH ----------------
 def login_required(fn):
     @wraps(fn)
-    def wrapper(*args, **kwargs):
+    def wrapper(*a, **k):
         if "user_id" not in session:
             return redirect(url_for("login"))
-        return fn(*args, **kwargs)
+        return fn(*a, **k)
     return wrapper
 
 # ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
-        u = request.form.get("username")
-        p = request.form.get("password")
-
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE username=%s", (u,))
-        user = cur.fetchone()
+        cur.execute("SELECT * FROM users WHERE username=%s", (request.form["username"],))
+        u = cur.fetchone()
         cur.close()
         conn.close()
 
-        if user and check_password_hash(user["password_hash"], p):
-            session["user_id"] = user["id"]
-            session["role"] = user["role"]
-            return redirect(url_for("dashboard"))
-
-        return render_template("login.html", error="Invalid username or password")
+        if u and check_password_hash(u["password_hash"], request.form["password"]):
+            session["user_id"] = u["id"]
+            return redirect("/")
+        return render_template("login.html", error="Invalid Login")
 
     return render_template("login.html")
 
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    return redirect("/login")
 
 # ---------------- HELPERS ----------------
 def row_to_obj(r):
-    return {
-        "id": r["id"],
-        "type": r["type"],
-        "customer": r["customer"],
-        "phone": r["phone"],
-        "model": r["model"],
-        "problem": r["problem"],
-        "receive_date": r["receive_date"],
-        "status": r["status"]
-    }
+    return dict(r)
 
 # ---------------- DASHBOARD ----------------
 @app.route("/")
@@ -128,14 +105,11 @@ def dashboard():
     cur.execute("SELECT * FROM entries WHERE status!='Delivered'")
     rows = cur.fetchall()
 
-    pending = len(rows)
     overdue = 0
     now_dt = datetime.datetime.now()
-
     for r in rows:
         try:
-            recv = datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")
-            if (now_dt - recv).days > 10:
+            if (now_dt - datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")).days > 10:
                 overdue += 1
         except:
             pass
@@ -145,7 +119,7 @@ def dashboard():
 
     return render_template("dashboard.html", kp={
         "today_sales": 0,
-        "pending": pending,
+        "pending": len(rows),
         "overdue": overdue,
         "ledger_bal": 0
     })
@@ -162,6 +136,33 @@ def overdue_page():
     return render_template("overdue.html")
 
 # ---------------- API ----------------
+
+# ✅ SERVICE SAVE (MISSING PART – NOW FIXED)
+@app.post("/api/entries")
+@login_required
+def add_entry():
+    d = request.get_json(force=True)
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO entries(type,customer,phone,model,problem,receive_date,status)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """, (
+        d.get("type",""),
+        d.get("customer",""),
+        d.get("phone",""),
+        d.get("model",""),
+        d.get("problem",""),
+        now(),
+        "Received"
+    ))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"ok": True})
+
 @app.get("/api/entries")
 @login_required
 def api_entries():
@@ -178,28 +179,20 @@ def api_entries():
 def api_overdue():
     conn = get_db()
     cur = conn.cursor()
-
-    cur.execute("""
-        SELECT * FROM entries
-        WHERE status!='Delivered'
-        AND receive_date IS NOT NULL
-    """)
+    cur.execute("SELECT * FROM entries WHERE status!='Delivered'")
     rows = cur.fetchall()
-
-    result = []
-    now_dt = datetime.datetime.now()
-
-    for r in rows:
-        try:
-            recv = datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")
-            if (now_dt - recv).days > 10:
-                result.append(row_to_obj(r))
-        except:
-            pass
-
     cur.close()
     conn.close()
-    return jsonify(result)
+
+    res = []
+    now_dt = datetime.datetime.now()
+    for r in rows:
+        try:
+            if (now_dt - datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")).days > 10:
+                res.append(row_to_obj(r))
+        except:
+            pass
+    return jsonify(res)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
