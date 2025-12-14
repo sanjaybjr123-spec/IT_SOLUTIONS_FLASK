@@ -96,22 +96,24 @@ function render(rows){
     <td>${r.receive_date||''}</td><td>${r.out_date||''}</td><td>${r.in_date||''}</td><td>${r.return_date||''}</td>  
     <td><span class="${fmtBadge(r.status||'')}">${r.status||''}</span></td>  
     <td class="text-nowrap">  
-      <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'out')">Out</button>  
-      <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'in')">In</button>  
-      <button class="btn btn-sm btn-outline-secondary" onclick="act(${r.id},'ready')">Ready</button>  
-      <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'delivered')">Delivered</button>  
-      <button class="btn btn-sm btn-outline-danger" onclick="act(${r.id},'reject')">Reject</button>  
-      <button class="btn btn-sm btn-outline-primary" onclick="openBill(${r.id})">Bill</button>  
-      <button class="btn btn-sm btn-outline-primary" onclick="window.open('/print/${r.id}','_blank')">Print</button>  
-      <button class="btn btn-sm btn-outline-dark"
-${r.status === 'Delivered' && r.whatsapp ? `
-<a href="${r.whatsapp}" target="_blank"
-   class="btn btn-sm btn-success">
-   📲 WhatsApp
-</a>
-` : ''}
- onclick="delE(${r.id})">Delete</button>
-    </td>`;  
+  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'out')">Out</button>  
+  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'in')">In</button>  
+  <button class="btn btn-sm btn-outline-secondary" onclick="act(${r.id},'ready')">Ready</button>  
+  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'delivered')">Delivered</button>  
+  <button class="btn btn-sm btn-outline-danger" onclick="act(${r.id},'reject')">Reject</button>  
+  <button class="btn btn-sm btn-outline-primary" onclick="openBill(${r.id})">Bill</button>  
+  <button class="btn btn-sm btn-outline-primary" onclick="window.open('/print/${r.id}','_blank')">Print</button>  
+
+  ${r.status === 'Delivered' && r.whatsapp ? `
+    <a href="${r.whatsapp}" target="_blank"
+       class="btn btn-sm btn-success">
+       📲 WhatsApp
+    </a>
+  ` : ''}
+
+  <button class="btn btn-sm btn-outline-dark"
+    onclick="delE(${r.id})">Delete</button>
+</td>
     tb.appendChild(tr);  
   });  
 }  
