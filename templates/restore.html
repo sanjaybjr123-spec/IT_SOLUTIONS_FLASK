@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4>Restore Backup</h4>
+  <a href="/logout" class="btn btn-sm btn-danger">Logout</a>
+</div>
+
+<div class="card p-3" style="max-width:480px;">
+  <form method="post" enctype="multipart/form-data">
+    <label class="form-label">Choose CSV File</label>
+    <input type="file" name="file" class="form-control" accept=".csv" required>
+
+    <label class="form-label mt-2">Restore Mode</label>
+    <select name="mode" class="form-select" required>
+      <option value="entries">Entries</option>
+      <option value="sales">Sales</option>
+      <option value="users">Users</option>
+    </select>
+
+    <button class="btn btn-primary mt-3 w-100">Restore</button>
+  </form>
+
+  {% if msg %}
+    <div class="alert alert-info mt-3">{{ msg }}</div>
+  {% endif %}
+</div>
+
+{% endblock %}
