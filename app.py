@@ -6,7 +6,7 @@ import psycopg2.extras
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
----------------- APP ----------------
+#---------------- APP ----------------
 
 app = Flask(name, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
@@ -14,7 +14,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
 def now():
 return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
----------------- DATABASE ----------------
+#---------------- DATABASE ----------------
 
 def get_db():
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -27,7 +27,7 @@ return psycopg2.connect(
     cursor_factory=psycopg2.extras.RealDictCursor  
 )
 
----------------- INIT DB ----------------
+#---------------- INIT DB ----------------
 
 def init_db():
 try:
@@ -85,7 +85,7 @@ except Exception as e:
 
 init_db()
 
----------------- AUTH HELPERS ----------------
+#---------------- AUTH HELPERS ----------------
 
 def login_required(fn):
 @wraps(fn)
@@ -103,7 +103,7 @@ return jsonify({"error": "Admin only"}), 403
 return fn(*args, **kwargs)
 return wrapper
 
----------------- LOGIN ----------------
+#---------------- LOGIN ----------------
 
 @app.route("/login", methods=["GET","POST"])
 def login():
@@ -132,7 +132,7 @@ def logout():
 session.clear()
 return redirect(url_for("login"))
 
----------------- HELPERS ----------------
+#---------------- HELPERS ----------------
 
 def row_to_obj(r):
 return {
@@ -152,7 +152,7 @@ return {
 "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
 }
 
----------------- DASHBOARD ----------------
+#---------------- DASHBOARD ----------------
 
 @app.route("/")
 @login_required
@@ -177,7 +177,7 @@ return render_template("dashboard.html", kp={
     "ledger_bal": 0  
 })
 
----------------- SERVICE ----------------
+#---------------- SERVICE ----------------
 
 @app.route("/service")
 @login_required
@@ -220,7 +220,7 @@ cur.close()
 conn.close()  
 return jsonify({"ok": True})
 
----------------- ENTRY ACTIONS ----------------
+#---------------- ENTRY ACTIONS ----------------
 
 @app.post("/api/entries/int:eid/action")
 @login_required
@@ -250,7 +250,7 @@ cur.close()
 conn.close()  
 return jsonify({"ok": True})
 
----------------- DELETE (ADMIN ONLY) ----------------
+#---------------- DELETE (ADMIN ONLY)
 
 @app.delete("/api/entries/int:eid")
 @login_required
@@ -264,7 +264,7 @@ cur.close()
 conn.close()
 return jsonify({"deleted": True})
 
----------------- CSV EXPORT / BACKUP (ADMIN ONLY) ----------------
+#---------------- CSV EXPORT / BACKUP (ADMIN ONLY)
 
 def export_csv(query, filename):
 conn = get_db()
@@ -306,7 +306,7 @@ return export_csv("SELECT * FROM sales ORDER BY id DESC", "sales_backup.csv")
 def export_users():
 return export_csv("SELECT id,username,role FROM users", "users_backup.csv")
 
----------------- RUN ----------------
+#---------------- RUN ----------------
 
 if name == "main":
 app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
