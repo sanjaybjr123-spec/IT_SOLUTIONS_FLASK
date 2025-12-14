@@ -10,12 +10,70 @@ app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
 def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+# ---------------- DATABASE ----------------
 def get_db():
     return psycopg2.connect(
         os.environ["DATABASE_URL"],
         sslmode="require",
         cursor_factory=psycopg2.extras.RealDictCursor
     )
+
+# ---------------- AUTO DB FIX (NO SQL NEEDED) ----------------
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS entries(
+        id SERIAL PRIMARY KEY,
+        type TEXT,
+        customer TEXT,
+        phone TEXT,
+        model TEXT,
+        problem TEXT,
+        receive_date TEXT,
+        status TEXT
+    )
+    """)
+
+    # 🔥 AUTO ADD MISSING COLUMNS
+    auto_cols = [
+        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS out_date TEXT",
+        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS in_date TEXT",
+        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS ready_date TEXT",
+        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS reject_date TEXT",
+        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS delivered_date TEXT",
+        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS amount REAL DEFAULT 0"
+    ]
+
+    for q in auto_cols:
+        try:
+            cur.execute(q)
+        except:
+            pass
+
+    # users table
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        password_hash TEXT,
+        role TEXT
+    )
+    """)
+
+    cur.execute("SELECT COUNT(*) c FROM users")
+    if cur.fetchone()["c"] == 0:
+        cur.execute(
+            "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
+            ("admin", generate_password_hash("admin@123"), "admin")
+        )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+init_db()
 
 # ---------------- AUTH ----------------
 def login_required(fn):
@@ -47,10 +105,6 @@ def login():
 def logout():
     session.clear()
     return redirect("/login")
-
-# ---------------- HELPERS ----------------
-def row_to_obj(r):
-    return dict(r)
 
 # ---------------- PAGES ----------------
 @app.route("/")
@@ -89,11 +143,10 @@ def overdue_page():
     return render_template("overdue.html")
 
 # ---------------- API ----------------
-
 @app.post("/api/entries")
 @login_required
 def add_entry():
-    d = request.get_json()
+    d = request.get_json(force=True)
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
@@ -124,25 +177,25 @@ def api_entries():
     cur.close(); conn.close()
     return jsonify(rows)
 
-# 🔥 FINAL FIX — STATUS + TIMESTAMP
+# ✅ DELIVERED FIXED
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
-    action = request.get_json().get("action","").lower()
+    action = request.get_json(force=True).get("action","").lower()
     t = now()
 
-    map_ = {
+    mapping = {
         "out": ("Out", "out_date"),
         "in": ("In", "in_date"),
         "ready": ("Ready", "ready_date"),
         "reject": ("Rejected", "reject_date"),
-        "delivered": ("Delivered", "delivered_date"),
+        "delivered": ("Delivered", "delivered_date")
     }
 
-    if action not in map_:
+    if action not in mapping:
         return jsonify(error="Invalid action"), 400
 
-    status, field = map_[action]
+    status, field = mapping[action]
 
     conn = get_db()
     cur = conn.cursor()
@@ -154,27 +207,23 @@ def entry_action(eid):
     cur.close(); conn.close()
     return jsonify(ok=True)
 
-@app.post("/api/entries/<int:eid>/amount")
-@login_required
-def update_amount(eid):
-    amount = float(request.get_json().get("amount",0))
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("UPDATE entries SET amount=%s WHERE id=%s", (amount, eid))
-    conn.commit()
-    cur.close(); conn.close()
-    return jsonify(ok=True)
-
+# ---------------- PRINT (FIXED) ----------------
 @app.route("/print/<int:eid>")
 @login_required
 def print_receipt(eid):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
+    cur.execute("""
+        SELECT *,
+        COALESCE(amount,0) AS amount
+        FROM entries WHERE id=%s
+    """, (eid,))
     r = cur.fetchone()
     cur.close(); conn.close()
+
     if not r:
         return "Not found", 404
+
     return render_template("receipt.html", e=r)
 
 # ---------------- RUN ----------------
