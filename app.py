@@ -23,41 +23,44 @@ def get_db():
     )
 
 def init_db():
-    conn = get_db()
-    cur = conn.cursor()
+    try:
+        conn = get_db()
+        cur = conn.cursor()
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS entries(
-      id SERIAL PRIMARY KEY,
-      type TEXT, customer TEXT, phone TEXT, model TEXT, problem TEXT,
-      receive_date TEXT, out_date TEXT, in_date TEXT, return_date TEXT,
-      status TEXT, bill_json TEXT
-    )""")
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS entries(
+          id SERIAL PRIMARY KEY,
+          type TEXT, customer TEXT, phone TEXT, model TEXT, problem TEXT,
+          receive_date TEXT, out_date TEXT, in_date TEXT, return_date TEXT,
+          status TEXT, bill_json TEXT
+        )""")
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS sales(
-      id SERIAL PRIMARY KEY,
-      sale_date TEXT, item TEXT, qty REAL, rate REAL, amount REAL,
-      payment_mode TEXT, note TEXT
-    )""")
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS sales(
+          id SERIAL PRIMARY KEY,
+          sale_date TEXT, item TEXT, qty REAL, rate REAL, amount REAL,
+          payment_mode TEXT, note TEXT
+        )""")
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS ledger(
-      id SERIAL PRIMARY KEY,
-      tx_date TEXT, party TEXT, tx_type TEXT, amount REAL, note TEXT
-    )""")
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ledger(
+          id SERIAL PRIMARY KEY,
+          tx_date TEXT, party TEXT, tx_type TEXT, amount REAL, note TEXT
+        )""")
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS customers(
-      id SERIAL PRIMARY KEY,
-      name TEXT, phone TEXT, address TEXT
-    )""")
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS customers(
+          id SERIAL PRIMARY KEY,
+          name TEXT, phone TEXT, address TEXT
+        )""")
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print("DB init skipped:", e)
 
-# 🔥 Render fix
+# 🔥 Render safe init
 init_db()
 
 def row_to_obj(r):
@@ -83,10 +86,7 @@ def dashboard():
     cur = conn.cursor()
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    cur.execute(
-        "SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s",
-        (today + "%",)
-    )
+    cur.execute("SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s", (today+"%",))
     t_sales = cur.fetchone()["s"]
 
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
@@ -102,19 +102,22 @@ def dashboard():
                 overdue += 1
 
     cur.execute("""
-    SELECT party, SUM(CASE WHEN tx_type='credit' THEN amount ELSE -amount END) bal
-    FROM ledger GROUP BY party
+        SELECT party,
+        SUM(CASE WHEN tx_type='credit' THEN amount ELSE -amount END) bal
+        FROM ledger GROUP BY party
     """)
     parties = cur.fetchall()
-    total_bal = sum([p["bal"] for p in parties])
+    total_bal = sum(p["bal"] for p in parties)
 
     cur.close()
     conn.close()
 
-    return render_template("dashboard.html",
-        kp={"today_sales": t_sales, "pending": pending,
-            "overdue": overdue, "ledger_bal": total_bal}
-    )
+    return render_template("dashboard.html", kp={
+        "today_sales": t_sales,
+        "pending": pending,
+        "overdue": overdue,
+        "ledger_bal": total_bal
+    })
 
 # ---------------- SERVICE ----------------
 @app.route("/service")
@@ -136,47 +139,48 @@ def add_entry():
     d = request.get_json(force=True)
     conn = get_db()
     cur = conn.cursor()
+
     cur.execute("""
         INSERT INTO entries(type,customer,phone,model,problem,receive_date,status)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
     """, (
-        d.get("type",""), d.get("customer",""), d.get("phone",""),
-        d.get("model",""), d.get("problem",""), now(), "Received"
+        d.get("type",""),
+        d.get("customer",""),
+        d.get("phone",""),
+        d.get("model",""),
+        d.get("problem",""),
+        now(),
+        "Received"
     ))
+
     conn.commit()
     cur.close()
     conn.close()
     return jsonify({"ok": True}), 201
 
-@app.post("/api/entries/<int:eid>/action")
-def do_action(eid):
-    d = request.get_json(force=True)
-    act = d.get("action","")
-    t = now()
-
+# ---------------- PRINT RECEIPT (FIXED) ----------------
+@app.get("/print/<int:eid>")
+def print_receipt(eid):
     conn = get_db()
     cur = conn.cursor()
-
-    if act == "out":
-        cur.execute("UPDATE entries SET out_date=%s,status='Out' WHERE id=%s", (t,eid))
-    elif act == "in":
-        cur.execute("UPDATE entries SET in_date=%s,status='In' WHERE id=%s", (t,eid))
-    elif act == "ready":
-        cur.execute("UPDATE entries SET status='Ready' WHERE id=%s", (eid,))
-    elif act == "delivered":
-        cur.execute("UPDATE entries SET return_date=%s,status='Delivered' WHERE id=%s", (t,eid))
-    elif act == "reject":
-        cur.execute("UPDATE entries SET status='NOT DONE' WHERE id=%s", (eid,))
-    else:
-        cur.close(); conn.close()
-        return ("Invalid action", 400)
-
-    conn.commit()
+    cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
+    r = cur.fetchone()
     cur.close()
     conn.close()
-    return jsonify({"ok": True})
 
-# ---------------- CSV EXPORT (OPTION 2) ----------------
+    if not r:
+        abort(404)
+
+    return render_template(
+        "receipt.html",
+        e=row_to_obj(r),
+        shop={
+            "name": "IT SOLUTIONS",
+            "addr": "GHATSILA COLLEGE ROAD"
+        }
+    )
+
+# ---------------- CSV EXPORT ----------------
 def export_csv(query, filename):
     conn = get_db()
     cur = conn.cursor()
@@ -196,7 +200,7 @@ def export_csv(query, filename):
     return Response(
         si.getvalue(),
         mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment;filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 @app.get("/export/entries")
