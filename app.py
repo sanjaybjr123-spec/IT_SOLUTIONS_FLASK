@@ -5,6 +5,7 @@ import psycopg2
 import psycopg2.extras
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import urllib.parse
 
 # ---------------- APP ----------------
 app = Flask(__name__, template_folder="templates")
@@ -30,7 +31,6 @@ def init_db():
         conn = get_db()
         cur = conn.cursor()
 
-        # entries
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
           id SERIAL PRIMARY KEY,
@@ -46,7 +46,6 @@ def init_db():
         )
         """)
 
-        # sales
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
           id SERIAL PRIMARY KEY,
@@ -55,7 +54,6 @@ def init_db():
         )
         """)
 
-        # users
         cur.execute("""
         CREATE TABLE IF NOT EXISTS users(
           id SERIAL PRIMARY KEY,
@@ -65,17 +63,12 @@ def init_db():
         )
         """)
 
-        # create default admin if none
         cur.execute("SELECT COUNT(*) AS c FROM users")
         if cur.fetchone()["c"] == 0:
             cur.execute("""
                 INSERT INTO users(username, password_hash, role)
                 VALUES (%s,%s,%s)
-            """, (
-                "admin",
-                generate_password_hash("admin@123"),
-                "admin"
-            ))
+            """, ("admin", generate_password_hash("admin@123"), "admin"))
 
         conn.commit()
         cur.close()
@@ -85,7 +78,7 @@ def init_db():
 
 init_db()
 
-# ---------------- AUTH HELPERS ----------------
+# ---------------- AUTH ----------------
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -148,20 +141,17 @@ def row_to_obj(r):
         "status": r["status"],
         "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
     }
-import urllib.parse
 
 def whatsapp_bill_link(entry, total):
     msg = f"""
-🧾 *IT SOLUTIONS*
+🧾 IT SOLUTIONS
 
 Customer: {entry['customer']}
-Phone: {entry['phone']}
 Model: {entry['model']}
-Problem: {entry['problem']}
 
-💰 *Total Bill:* ₹{total}
+💰 Total Bill: ₹{total}
 
-🙏 Thank you for choosing us!
+🙏 Thank you!
 """
     text = urllib.parse.quote(msg)
     phone = entry["phone"].replace("+","").replace(" ","")
@@ -186,9 +176,8 @@ def export_entries():
         for r in rows:
             cw.writerow(r.values())
 
-    output = si.getvalue()
     return Response(
-        output,
+        si.getvalue(),
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment;filename=entries.csv"}
     )
@@ -234,25 +223,16 @@ def list_entries():
     conn.close()
 
     data = []
+    for r in rows:
+        obj = row_to_obj(r)
 
-for r in rows:
-    obj = row_to_obj(r)
+        bill = obj["bill"]
+        total = bill.get("parts_total",0) + bill.get("service_charge",0) + bill.get("other",0)
 
-    bill = obj["bill"]
-    total = (
-        bill.get("parts_total", 0)
-        + bill.get("service_charge", 0)
-        + bill.get("other", 0)
-    )
+        obj["whatsapp"] = whatsapp_bill_link(obj, total) if obj["status"]=="Delivered" and obj["phone"] else ""
+        data.append(obj)
 
-    if obj["status"] == "Delivered" and obj.get("phone"):
-        obj["whatsapp"] = whatsapp_bill_link(obj, total)
-    else:
-        obj["whatsapp"] = ""
-
-    data.append(obj)
-
-return jsonify(data)
+    return jsonify(data)
 
 @app.post("/api/entries")
 @login_required
@@ -285,7 +265,6 @@ def add_entry():
 def overdue_page():
     return render_template("overdue.html")
 
-
 @app.get("/api/overdue")
 @login_required
 def overdue_list():
@@ -304,7 +283,6 @@ def overdue_list():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-
     return jsonify([row_to_obj(r) for r in rows])
 
 # ---------------- ENTRY ACTIONS ----------------
@@ -354,7 +332,6 @@ def save_bill(eid):
 
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("UPDATE entries SET bill_json=%s WHERE id=%s", (json.dumps(bill), eid))
     cur.execute("""
         INSERT INTO sales(sale_date,item,qty,rate,amount,payment_mode,note)
@@ -366,7 +343,7 @@ def save_bill(eid):
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- DELETE (ADMIN ONLY) ----------------
+# ---------------- DELETE ----------------
 @app.delete("/api/entries/<int:eid>")
 @login_required
 @admin_required
