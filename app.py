@@ -31,7 +31,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS entries(
           id SERIAL PRIMARY KEY,
           type TEXT, customer TEXT, phone TEXT, model TEXT, problem TEXT,
-          receive_date TEXT, out_date TEXT, in_date TEXT, return_date TEXT,
+          receive_date TEXT, return_date TEXT,
           status TEXT, bill_json TEXT
         )""")
 
@@ -40,12 +40,6 @@ def init_db():
           id SERIAL PRIMARY KEY,
           sale_date TEXT, item TEXT, qty REAL, rate REAL, amount REAL,
           payment_mode TEXT, note TEXT
-        )""")
-
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS ledger(
-          id SERIAL PRIMARY KEY,
-          tx_date TEXT, party TEXT, tx_type TEXT, amount REAL, note TEXT
         )""")
 
         cur.execute("""
@@ -60,9 +54,9 @@ def init_db():
     except Exception as e:
         print("DB init skipped:", e)
 
-# 🔥 Render safe init
 init_db()
 
+# ---------------- HELPERS ----------------
 def row_to_obj(r):
     return {
         "id": r["id"],
@@ -72,11 +66,9 @@ def row_to_obj(r):
         "model": r["model"],
         "problem": r["problem"],
         "receive_date": r["receive_date"],
-        "out_date": r["out_date"],
-        "in_date": r["in_date"],
         "return_date": r["return_date"],
         "status": r["status"],
-        "bill": json.loads(r["bill_json"]) if r["bill_json"] else None
+        "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
     }
 
 # ---------------- DASHBOARD ----------------
@@ -86,38 +78,27 @@ def dashboard():
     cur = conn.cursor()
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    cur.execute("SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s", (today+"%",))
-    t_sales = cur.fetchone()["s"]
+    cur.execute(
+        "SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s",
+        (today + "%",)
+    )
+    today_sales = cur.fetchone()["s"]
 
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
 
-    overdue = 0
-    cur.execute("SELECT receive_date,status FROM entries")
-    for r in cur.fetchall():
-        if r["status"] != "Delivered" and r["receive_date"]:
-            diff = (datetime.datetime.now() -
-                    datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")).days
-            if diff > 10:
-                overdue += 1
-
-    cur.execute("""
-        SELECT party,
-        SUM(CASE WHEN tx_type='credit' THEN amount ELSE -amount END) bal
-        FROM ledger GROUP BY party
-    """)
-    parties = cur.fetchall()
-    total_bal = sum(p["bal"] for p in parties)
-
     cur.close()
     conn.close()
 
-    return render_template("dashboard.html", kp={
-        "today_sales": t_sales,
-        "pending": pending,
-        "overdue": overdue,
-        "ledger_bal": total_bal
-    })
+    return render_template(
+        "dashboard.html",
+        kp={
+            "today_sales": today_sales,
+            "pending": pending,
+            "overdue": 0,
+            "ledger_bal": 0
+        }
+    )
 
 # ---------------- SERVICE ----------------
 @app.route("/service")
@@ -158,7 +139,32 @@ def add_entry():
     conn.close()
     return jsonify({"ok": True}), 201
 
-# ---------------- PRINT RECEIPT (FIXED) ----------------
+# ---------------- SAVE BILL (CASH / UPI / CARD) ----------------
+@app.post("/api/entries/<int:eid>/bill")
+def save_bill(eid):
+    d = request.get_json(force=True)
+
+    bill = {
+        "parts": d.get("parts",""),
+        "parts_total": float(d.get("parts_total") or 0),
+        "service_charge": float(d.get("service_charge") or 0),
+        "other": float(d.get("other") or 0),
+        "payment_mode": d.get("payment_mode","Cash")  # Cash / UPI / Card
+    }
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE entries SET bill_json=%s WHERE id=%s",
+        (json.dumps(bill), eid)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"ok": True})
+
+# ---------------- PRINT RECEIPT ----------------
 @app.get("/print/<int:eid>")
 def print_receipt(eid):
     conn = get_db()
@@ -206,14 +212,6 @@ def export_csv(query, filename):
 @app.get("/export/entries")
 def export_entries():
     return export_csv("SELECT * FROM entries ORDER BY id DESC", "entries.csv")
-
-@app.get("/export/sales")
-def export_sales():
-    return export_csv("SELECT * FROM sales ORDER BY id DESC", "sales.csv")
-
-@app.get("/export/customers")
-def export_customers():
-    return export_csv("SELECT * FROM customers ORDER BY id DESC", "customers.csv")
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
