@@ -25,12 +25,12 @@ def get_db():
         cursor_factory=psycopg2.extras.RealDictCursor
     )
 
+# ---------------- INIT DB ----------------
 def init_db():
     try:
         conn = get_db()
         cur = conn.cursor()
 
-        # entries
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
           id SERIAL PRIMARY KEY,
@@ -46,7 +46,6 @@ def init_db():
         )
         """)
 
-        # sales
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
           id SERIAL PRIMARY KEY,
@@ -55,7 +54,6 @@ def init_db():
         )
         """)
 
-        # users
         cur.execute("""
         CREATE TABLE IF NOT EXISTS users(
           id SERIAL PRIMARY KEY,
@@ -65,7 +63,6 @@ def init_db():
         )
         """)
 
-        # create default admin if none
         cur.execute("SELECT COUNT(*) AS c FROM users")
         if cur.fetchone()["c"] == 0:
             cur.execute("""
@@ -244,36 +241,6 @@ def entry_action(eid):
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- BILL ----------------
-@app.post("/api/entries/<int:eid>/bill")
-@login_required
-def save_bill(eid):
-    d = request.get_json(force=True)
-
-    bill = {
-        "parts": d.get("parts",""),
-        "parts_total": float(d.get("parts_total") or 0),
-        "service_charge": float(d.get("service_charge") or 0),
-        "other": float(d.get("other") or 0),
-        "payment_mode": d.get("payment_mode","Cash")
-    }
-
-    total = bill["parts_total"] + bill["service_charge"] + bill["other"]
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("UPDATE entries SET bill_json=%s WHERE id=%s", (json.dumps(bill), eid))
-    cur.execute("""
-        INSERT INTO sales(sale_date,item,qty,rate,amount,payment_mode,note)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
-    """, (now(),"Service Bill",1,total,total,bill["payment_mode"],f"Entry {eid}"))
-
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"ok": True})
-
 # ---------------- DELETE (ADMIN ONLY) ----------------
 @app.delete("/api/entries/<int:eid>")
 @login_required
@@ -287,22 +254,46 @@ def delete_entry(eid):
     conn.close()
     return jsonify({"deleted": True})
 
-# ---------------- PRINT ----------------
-@app.get("/print/<int:eid>")
-@login_required
-def print_receipt(eid):
+# ---------------- CSV EXPORT / BACKUP (ADMIN ONLY) ----------------
+def export_csv(query, filename):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
-    r = cur.fetchone()
+    cur.execute(query)
+    rows = cur.fetchall()
     cur.close()
     conn.close()
-    if not r:
-        abort(404)
 
-    return render_template("receipt.html", e=row_to_obj(r),
-        shop={"name":"IT SOLUTIONS","addr":"GHATSILA COLLEGE ROAD"}
+    si = StringIO()
+    writer = csv.writer(si)
+
+    if rows:
+        writer.writerow(rows[0].keys())
+        for r in rows:
+            writer.writerow(r.values())
+
+    return Response(
+        si.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+@app.get("/export/entries")
+@login_required
+@admin_required
+def export_entries():
+    return export_csv("SELECT * FROM entries ORDER BY id DESC", "entries_backup.csv")
+
+@app.get("/export/sales")
+@login_required
+@admin_required
+def export_sales():
+    return export_csv("SELECT * FROM sales ORDER BY id DESC", "sales_backup.csv")
+
+@app.get("/export/users")
+@login_required
+@admin_required
+def export_users():
+    return export_csv("SELECT id,username,role FROM users", "users_backup.csv")
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
