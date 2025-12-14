@@ -1,46 +1,39 @@
 <script>
-async function api(url) {
-  const r = await fetch(url);
-  if (!r.ok) {
-    throw new Error("API Error");
+async function api(p,opt={}) {
+  const r = await fetch(p,opt);
+  if(!r.ok){
+    throw new Error("API error");
   }
   return await r.json();
 }
 
-async function load() {
-  try {
-    // ✅ SERVER-SIDE OVERDUE DATA
+async function load(){
+  try{
     const rows = await api('/api/overdue');
 
     const tb = document.querySelector('#tbl tbody');
     tb.innerHTML = '';
 
-    if (rows.length === 0) {
-      tb.innerHTML = `
-        <tr>
-          <td colspan="9" class="text-center text-muted">
-            No overdue devices 🎉
-          </td>
-        </tr>
-      `;
+    if(rows.length === 0){
+      tb.innerHTML = `<tr>
+        <td colspan="9" class="text-center text-muted">
+          No overdue devices 🎉
+        </td>
+      </tr>`;
       return;
     }
 
-    rows.forEach((r, i) => {
+    rows.forEach((r,i)=>{
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${i + 1}</td>
-        <td>${r.type || ''}</td>
-        <td>${r.customer || ''}</td>
-        <td>${r.phone || ''}</td>
-        <td>${r.model || ''}</td>
-        <td>${r.problem || ''}</td>
-        <td>${r.receive_date || ''}</td>
-        <td>
-          <span class="badge bg-danger">
-            ${r.status}
-          </span>
-        </td>
+        <td>${i+1}</td>
+        <td>${r.type}</td>
+        <td>${r.customer}</td>
+        <td>${r.phone}</td>
+        <td>${r.model}</td>
+        <td>${r.problem}</td>
+        <td>${r.receive_date}</td>
+        <td><span class="badge bg-danger">${r.status}</span></td>
         <td>
           <button class="btn btn-sm btn-primary"
             onclick="window.open('/print/${r.id}','_blank')">
@@ -51,7 +44,7 @@ async function load() {
       tb.appendChild(tr);
     });
 
-  } catch (e) {
+  }catch(e){
     alert("Failed to load overdue list");
     console.error(e);
   }
