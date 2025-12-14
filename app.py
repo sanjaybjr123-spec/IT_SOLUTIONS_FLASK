@@ -278,27 +278,26 @@ def overdue_page():
 def api_overdue():
     conn = get_db()
     cur = conn.cursor()
+
+    # 10 days se zyada purane aur Delivered nahi
+    limit_date = (
+        datetime.datetime.now() - datetime.timedelta(days=10)
+    ).strftime("%Y-%m-%d %H:%M:%S")
+
     cur.execute("""
         SELECT * FROM entries
-        WHERE status!='Delivered'
+        WHERE status != 'Delivered'
         AND receive_date IS NOT NULL
-    """)
+        AND receive_date < %s
+        ORDER BY receive_date ASC
+    """, (limit_date,))
+
     rows = cur.fetchall()
     cur.close()
     conn.close()
 
-    now_dt = datetime.datetime.now()
-    overdue = []
-
-    for r in rows:
-        try:
-            recv = datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")
-            if (now_dt - recv).days > 10:
-                overdue.append(row_to_obj(r))
-        except:
-            pass
-
-    return jsonify(overdue)
+    return jsonify([row_to_obj(r) for r in rows])
+    
 
 # ---------------- DELETE ----------------
 @app.delete("/api/entries/<int:eid>")
