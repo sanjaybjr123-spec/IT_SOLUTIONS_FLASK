@@ -236,9 +236,9 @@ def add_entry():
     conn.close()
     return jsonify({"ok": True})
 
-@app.route("/api/overdue")
+@app.route("/overdue")
 @login_required
-def api_overdue():
+def overdue():
     conn = get_db()
     cur = conn.cursor()
 
