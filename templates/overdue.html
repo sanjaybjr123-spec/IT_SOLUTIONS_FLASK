@@ -1,29 +1,52 @@
-@app.route("/api/overdue")
-@login_required
-def api_overdue():
-    conn = get_db()
-    cur = conn.cursor()
+{% extends "base.html" %}
+{% block content %}
 
-    cur.execute("""
-        SELECT * FROM entries
-        WHERE status != 'Delivered'
-        AND receive_date IS NOT NULL
-    """)
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+<div class="card p-3">
+  <h5>Overdue Device List (&gt; 10 Days)</h5>
 
-    overdue = []
-    now_dt = datetime.datetime.now()
+  <div class="table-responsive">
+    <table class="table table-sm" id="tbl">
+      <thead class="table-warning">
+        <tr>
+          <th>#</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Model</th>
+          <th>Receive Date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
 
-    for r in rows:
-        try:
-            recv = datetime.datetime.strptime(
-                r["receive_date"], "%Y-%m-%d %H:%M:%S"
-            )
-            if (now_dt - recv).days > 10:
-                overdue.append(row_to_obj(r))
-        except:
-            pass
+<script>
+async function loadOverdue(){
+  try{
+    const r = await fetch("/api/overdue");
+    const data = await r.json();
 
-    return jsonify(overdue)
+    const tb = document.querySelector("#tbl tbody");
+    tb.innerHTML = "";
+
+    data.forEach((r,i)=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${r.customer}</td>
+        <td>${r.phone}</td>
+        <td>${r.model}</td>
+        <td>${r.receive_date}</td>
+        <td><span class="badge bg-danger">${r.status}</span></td>
+      `;
+      tb.appendChild(tr);
+    });
+  }catch(e){
+    alert("Failed to load overdue list");
+  }
+}
+loadOverdue();
+</script>
+
+{% endblock %}
