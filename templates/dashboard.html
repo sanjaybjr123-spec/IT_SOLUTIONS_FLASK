@@ -21,8 +21,10 @@
 
 <!-- KPI CARDS -->
 <div class="row g-3">
+
+  <!-- TODAY SALES -->
   <div class="col-md-3">
-    <div class="card p-3">
+    <div class="card p-3 h-100">
       <div class="text-muted">Today's Sales</div>
       <div class="fs-3 fw-bold">
         ₹ {{ '%.2f'|format(kp.today_sales) }}
@@ -30,8 +32,9 @@
     </div>
   </div>
 
+  <!-- PENDING -->
   <div class="col-md-3">
-    <div class="card p-3">
+    <div class="card p-3 h-100">
       <div class="text-muted">Pending Devices</div>
       <div class="fs-3 fw-bold">
         {{ kp.pending }}
@@ -39,23 +42,33 @@
     </div>
   </div>
 
+  <!-- OVERDUE (CLICKABLE) -->
   <div class="col-md-3">
-    <div class="card p-3">
-      <div class="text-muted">Overdue (&gt;10 days)</div>
-      <div class="fs-3 fw-bold text-danger">
-        {{ kp.overdue }}
+    <a href="/overdue" style="text-decoration:none">
+      <div class="card p-3 h-100 border-danger">
+        <div class="text-muted">
+          Overdue (&gt;10 days)
+        </div>
+        <div class="fs-3 fw-bold text-danger">
+          {{ kp.overdue }}
+        </div>
+        <small class="text-danger">
+          View overdue list →
+        </small>
       </div>
-    </div>
+    </a>
   </div>
 
+  <!-- LEDGER -->
   <div class="col-md-3">
-    <div class="card p-3">
+    <div class="card p-3 h-100">
       <div class="text-muted">Ledger Balance (Net)</div>
       <div class="fs-3 fw-bold">
         ₹ {{ '%.2f'|format(kp.ledger_bal) }}
       </div>
     </div>
   </div>
+
 </div>
 
 <!-- QUICK ACTIONS -->
@@ -67,6 +80,10 @@
     <!-- STAFF + ADMIN -->
     <a href="/service" class="btn btn-primary">
       New Service Entry
+    </a>
+
+    <a href="/overdue" class="btn btn-warning">
+      Overdue List
     </a>
 
     <!-- ADMIN ONLY -->
