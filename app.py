@@ -232,8 +232,26 @@ def list_entries():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return jsonify([row_to_obj(r) for r in rows])
+    data = []
 
+for r in rows:
+    obj = row_to_obj(r)
+
+    bill = obj["bill"]
+    total = (
+        bill.get("parts_total", 0)
+        + bill.get("service_charge", 0)
+        + bill.get("other", 0)
+    )
+
+    if obj["status"] == "Delivered" and obj.get("phone"):
+        obj["whatsapp"] = whatsapp_bill_link(obj, total)
+    else:
+        obj["whatsapp"] = ""
+
+    data.append(obj)
+
+return jsonify(data)
 @app.post("/api/entries")
 @login_required
 def add_entry():
