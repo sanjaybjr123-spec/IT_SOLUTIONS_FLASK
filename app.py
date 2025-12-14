@@ -10,7 +10,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
 def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# ---------------- DATABASE ----------------
 def get_db():
     return psycopg2.connect(
         os.environ["DATABASE_URL"],
@@ -32,23 +31,16 @@ def init_db():
         model TEXT,
         problem TEXT,
         receive_date TEXT,
-        status TEXT
+        status TEXT,
+        out_date TEXT,
+        in_date TEXT,
+        ready_date TEXT,
+        reject_date TEXT,
+        delivered_date TEXT,
+        amount REAL DEFAULT 0,
+        bill_json TEXT
     )
     """)
-
-    # auto add missing columns (SAFE)
-    cols = [
-        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS out_date TEXT",
-        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS in_date TEXT",
-        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS ready_date TEXT",
-        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS reject_date TEXT",
-        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS delivered_date TEXT",
-        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS amount REAL DEFAULT 0",
-        "ALTER TABLE entries ADD COLUMN IF NOT EXISTS bill_json TEXT"
-    ]
-    for q in cols:
-        try: cur.execute(q)
-        except: pass
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
@@ -141,7 +133,6 @@ def overdue_page():
 
 # ---------------- API ----------------
 
-# ADD ENTRY
 @app.post("/api/entries")
 @login_required
 def add_entry():
@@ -150,8 +141,8 @@ def add_entry():
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO entries
-        (type,customer,phone,model,problem,receive_date,status,amount)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        (type,customer,phone,model,problem,receive_date,status)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
     """, (
         d.get("type",""),
         d.get("customer",""),
@@ -159,14 +150,12 @@ def add_entry():
         d.get("model",""),
         d.get("problem",""),
         now(),
-        "Received",
-        float(d.get("amount",0))
+        "Received"
     ))
     conn.commit()
     cur.close(); conn.close()
     return jsonify(ok=True)
 
-# LIST
 @app.get("/api/entries")
 @login_required
 def api_entries():
@@ -177,7 +166,6 @@ def api_entries():
     cur.close(); conn.close()
     return jsonify(rows)
 
-# STATUS + TIMESTAMP (FINAL FIX)
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
@@ -189,7 +177,7 @@ def entry_action(eid):
         "in": ("In", "in_date"),
         "ready": ("Ready", "ready_date"),
         "reject": ("Rejected", "reject_date"),
-        "delivered": ("Delivered", "delivered_date")
+        "delivered": ("Delivered", "delivered_date"),
     }
 
     if action not in mapping:
@@ -207,7 +195,6 @@ def entry_action(eid):
     cur.close(); conn.close()
     return jsonify(ok=True)
 
-# DELETE (FIXED)
 @app.delete("/api/entries/<int:eid>")
 @login_required
 def delete_entry(eid):
@@ -218,25 +205,12 @@ def delete_entry(eid):
     cur.close(); conn.close()
     return jsonify(ok=True)
 
-# BILL SAVE (SAFE – popup error nahi aayega)
 @app.post("/api/entries/<int:eid>/bill")
 @login_required
 def save_bill(eid):
     d = request.get_json(force=True)
-
-    parts_total = float(d.get("parts_total",0))
-    service_charge = float(d.get("service_charge",0))
-    other = float(d.get("other",0))
-    total = parts_total + service_charge + other
-
-    bill = {
-        "parts": d.get("parts",""),
-        "parts_total": parts_total,
-        "service_charge": service_charge,
-        "other": other,
-        "payment_mode": d.get("payment_mode","Cash"),
-        "total": total
-    }
+    total = float(d.get("parts_total",0)) + float(d.get("service_charge",0)) + float(d.get("other",0))
+    bill = {**d, "total": total}
 
     conn = get_db()
     cur = conn.cursor()
@@ -248,7 +222,6 @@ def save_bill(eid):
     cur.close(); conn.close()
     return jsonify(ok=True)
 
-# PRINT (NO INTERNAL ERROR)
 @app.route("/print/<int:eid>")
 @login_required
 def print_receipt(eid):
@@ -258,14 +231,7 @@ def print_receipt(eid):
     r = cur.fetchone()
     cur.close(); conn.close()
 
-    if not r:
-        return "Not found", 404
-
-    bill = {}
-    if r.get("bill_json"):
-        try: bill = json.loads(r["bill_json"])
-        except: pass
-
+    bill = json.loads(r["bill_json"]) if r.get("bill_json") else {}
     return render_template("receipt.html", e=r, bill=bill)
 
 # ---------------- RUN ----------------
