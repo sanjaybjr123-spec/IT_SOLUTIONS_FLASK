@@ -5,11 +5,18 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="mb-0">Dashboard</h4>
 
-  <!-- LOGOUT BUTTON -->
-  <a href="/logout"
-     class="btn btn-sm btn-danger">
-     Logout
-  </a>
+  <!-- RIGHT ACTIONS -->
+  <div class="d-flex gap-2">
+    {% if session.role == 'admin' %}
+      <a href="/export/entries" class="btn btn-sm btn-outline-dark">
+        ⬇ Export Backup
+      </a>
+    {% endif %}
+
+    <a href="/logout" class="btn btn-sm btn-danger">
+      Logout
+    </a>
+  </div>
 </div>
 
 <!-- KPI CARDS -->
@@ -57,24 +64,21 @@
 
   <div class="d-flex flex-wrap gap-2">
 
-    <!-- COMMON FOR ADMIN + STAFF -->
+    <!-- STAFF + ADMIN -->
     <a href="/service" class="btn btn-primary">
       New Service Entry
     </a>
 
-    <!-- ADMIN ONLY BUTTONS -->
+    <!-- ADMIN ONLY -->
     {% if session.role == 'admin' %}
-      <a href="/sales" class="btn btn-success">
-        Add Sale
+      <a href="/export/entries" class="btn btn-outline-dark">
+        Backup Services
       </a>
-      <a href="/ledger" class="btn btn-secondary">
-        Ledger Entry
+      <a href="/export/sales" class="btn btn-outline-success">
+        Backup Sales
       </a>
-      <a href="/customers" class="btn btn-info">
-        Add Customer
-      </a>
-      <a href="/overdue" class="btn btn-warning">
-        View Overdue
+      <a href="/export/users" class="btn btn-outline-secondary">
+        Backup Users
       </a>
     {% endif %}
 
