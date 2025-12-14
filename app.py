@@ -70,7 +70,6 @@ def init_db():
     except Exception as e:
         print("DB init skipped:", e)
 
-# safe init
 init_db()
 
 # ---------------- HELPERS ----------------
@@ -107,15 +106,12 @@ def dashboard():
     cur.close()
     conn.close()
 
-    return render_template(
-        "dashboard.html",
-        kp={
-            "today_sales": today_sales,
-            "pending": pending,
-            "overdue": 0,
-            "ledger_bal": 0
-        }
-    )
+    return render_template("dashboard.html", kp={
+        "today_sales": today_sales,
+        "pending": pending,
+        "overdue": 0,
+        "ledger_bal": 0
+    })
 
 # ---------------- SERVICE ----------------
 @app.route("/service")
@@ -156,6 +152,39 @@ def add_entry():
     conn.close()
     return jsonify({"ok": True}), 201
 
+# ---------------- ENTRY ACTIONS (FIXED) ----------------
+@app.post("/api/entries/<int:eid>/action")
+def entry_action(eid):
+    d = request.get_json(force=True)
+    action = d.get("action")
+    t = now()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    if action == "out":
+        cur.execute("UPDATE entries SET status='Out' WHERE id=%s", (eid,))
+    elif action == "in":
+        cur.execute("UPDATE entries SET status='In' WHERE id=%s", (eid,))
+    elif action == "ready":
+        cur.execute("UPDATE entries SET status='Ready' WHERE id=%s", (eid,))
+    elif action == "delivered":
+        cur.execute(
+            "UPDATE entries SET status='Delivered', return_date=%s WHERE id=%s",
+            (t, eid)
+        )
+    elif action == "reject":
+        cur.execute("UPDATE entries SET status='Rejected' WHERE id=%s", (eid,))
+    else:
+        cur.close()
+        conn.close()
+        return jsonify({"error": "Invalid action"}), 400
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
+
 # ---------------- SAVE BILL (Cash / UPI / Card) ----------------
 @app.post("/api/entries/<int:eid>/bill")
 def save_bill(eid):
@@ -169,22 +198,16 @@ def save_bill(eid):
         "payment_mode": d.get("payment_mode","Cash")
     }
 
-    total_amount = (
-        bill["parts_total"] +
-        bill["service_charge"] +
-        bill["other"]
-    )
+    total_amount = bill["parts_total"] + bill["service_charge"] + bill["other"]
 
     conn = get_db()
     cur = conn.cursor()
 
-    # save bill
     cur.execute(
         "UPDATE entries SET bill_json=%s WHERE id=%s",
         (json.dumps(bill), eid)
     )
 
-    # save into sales table
     cur.execute("""
         INSERT INTO sales(sale_date,item,qty,rate,amount,payment_mode,note)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
@@ -201,18 +224,15 @@ def save_bill(eid):
     conn.commit()
     cur.close()
     conn.close()
-
     return jsonify({"ok": True})
 
-# ---------------- DELETE ENTRY (FIXED) ----------------
+# ---------------- DELETE ENTRY ----------------
 @app.delete("/api/entries/<int:eid>")
 def delete_entry(eid):
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("DELETE FROM entries WHERE id=%s", (eid,))
     conn.commit()
-
     cur.close()
     conn.close()
     return jsonify({"deleted": True})
