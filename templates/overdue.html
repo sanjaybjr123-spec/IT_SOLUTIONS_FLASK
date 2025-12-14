@@ -1,27 +1,51 @@
-{% extends "base.html" %}{% block content %}
-<div class="card p-3">
-  <h5>Overdue Device List ( > 10 days )</h5>
-  <div class="table-responsive">
-    <table class="table table-sm" id="tbl">
-      <thead class="table-warning"><tr><th>#</th><th>Type</th><th>Customer</th><th>Phone</th><th>Model</th><th>Problem</th><th>Receive</th><th>Status</th><th>Action</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-</div>
 <script>
-async function api(p,opt={}){const r=await fetch(p,opt);if(!r.ok)throw new Error(await r.text());return await r.json();}
+async function api(p,opt={}) {
+  const r = await fetch(p,opt);
+  if(!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
+
+function parseDate(s){
+  // "2025-12-14 04:39:23" → "2025-12-14T04:39:23"
+  return new Date(s.replace(' ', 'T'));
+}
+
 async function load(){
-  const rows=await api('/api/entries');
-  const od=rows.filter(r=>r.status!=="Delivered" && r.receive_date && ((new Date()-new Date(r.receive_date))/(1000*60*60*24)>10));
-  const tb=document.querySelector('#tbl tbody'); tb.innerHTML='';
+  const rows = await api('/api/entries');
+  const now = new Date();
+
+  const od = rows.filter(r => {
+    if(r.status === "Delivered" || !r.receive_date) return false;
+    const recv = parseDate(r.receive_date);
+    if(isNaN(recv)) return false;
+    const days = (now - recv) / (1000*60*60*24);
+    return days > 10;
+  });
+
+  const tb = document.querySelector('#tbl tbody');
+  tb.innerHTML = '';
+
   od.forEach((r,i)=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i+1}</td><td>${r.type}</td><td>${r.customer}</td><td>${r.phone}</td>
-    <td>${r.model}</td><td>${r.problem}</td><td>${r.receive_date}</td><td>${r.status}</td>
-    <td><button class="btn btn-sm btn-primary" onclick="window.open('/print/${r.id}','_blank')">Print</button></td>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${r.type}</td>
+      <td>${r.customer}</td>
+      <td>${r.phone}</td>
+      <td>${r.model}</td>
+      <td>${r.problem}</td>
+      <td>${r.receive_date}</td>
+      <td><span class="badge bg-danger">${r.status}</span></td>
+      <td>
+        <button class="btn btn-sm btn-primary"
+          onclick="window.open('/print/${r.id}','_blank')">
+          Print
+        </button>
+      </td>
+    `;
     tb.appendChild(tr);
   });
 }
+
 load();
 </script>
-{% endblock %}
