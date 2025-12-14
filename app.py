@@ -4,75 +4,25 @@ import psycopg2, psycopg2.extras
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
-# ---------------- APP ----------------
 app = Flask(__name__, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
 
 def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# ---------------- DATABASE ----------------
 def get_db():
-    if "DATABASE_URL" not in os.environ:
-        raise RuntimeError("DATABASE_URL not set")
     return psycopg2.connect(
         os.environ["DATABASE_URL"],
         sslmode="require",
         cursor_factory=psycopg2.extras.RealDictCursor
     )
 
-# ---------------- INIT DB ----------------
-def init_db():
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS entries(
-        id SERIAL PRIMARY KEY,
-        type TEXT,
-        customer TEXT,
-        phone TEXT,
-        model TEXT,
-        problem TEXT,
-        receive_date TEXT,
-        out_date TEXT,
-        in_date TEXT,
-        ready_date TEXT,
-        reject_date TEXT,
-        delivered_date TEXT,
-        status TEXT,
-        amount REAL DEFAULT 0
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users(
-        id SERIAL PRIMARY KEY,
-        username TEXT UNIQUE,
-        password_hash TEXT,
-        role TEXT
-    )
-    """)
-
-    cur.execute("SELECT COUNT(*) c FROM users")
-    if cur.fetchone()["c"] == 0:
-        cur.execute(
-            "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
-            ("admin", generate_password_hash("admin@123"), "admin")
-        )
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-init_db()
-
 # ---------------- AUTH ----------------
 def login_required(fn):
     @wraps(fn)
     def wrapper(*a, **k):
         if "user_id" not in session:
-            return redirect(url_for("login"))
+            return redirect("/login")
         return fn(*a, **k)
     return wrapper
 
@@ -84,12 +34,10 @@ def login():
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username=%s", (request.form["username"],))
         u = cur.fetchone()
-        cur.close()
-        conn.close()
+        cur.close(); conn.close()
 
         if u and check_password_hash(u["password_hash"], request.form["password"]):
             session["user_id"] = u["id"]
-            session["role"] = u["role"]
             return redirect("/")
         return render_template("login.html", error="Invalid Login")
 
@@ -102,19 +50,9 @@ def logout():
 
 # ---------------- HELPERS ----------------
 def row_to_obj(r):
-    return {
-        "id": r["id"],
-        "type": r["type"],
-        "customer": r["customer"],
-        "phone": r["phone"],
-        "model": r["model"],
-        "problem": r["problem"],
-        "receive_date": r["receive_date"],
-        "status": r["status"],
-        "amount": float(r.get("amount", 0))
-    }
+    return dict(r)
 
-# ---------------- DASHBOARD ----------------
+# ---------------- PAGES ----------------
 @app.route("/")
 @login_required
 def dashboard():
@@ -122,16 +60,13 @@ def dashboard():
     cur = conn.cursor()
     cur.execute("SELECT * FROM entries WHERE status!='Delivered'")
     rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    cur.close(); conn.close()
 
     overdue = 0
     now_dt = datetime.datetime.now()
     for r in rows:
         try:
-            if (now_dt - datetime.datetime.strptime(
-                r["receive_date"], "%Y-%m-%d %H:%M:%S"
-            )).days > 10:
+            if (now_dt - datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")).days > 10:
                 overdue += 1
         except:
             pass
@@ -143,7 +78,6 @@ def dashboard():
         "ledger_bal": 0
     })
 
-# ---------------- PAGES ----------------
 @app.route("/service")
 @login_required
 def service_page():
@@ -156,16 +90,15 @@ def overdue_page():
 
 # ---------------- API ----------------
 
-# ADD ENTRY
 @app.post("/api/entries")
 @login_required
 def add_entry():
-    d = request.get_json(force=True)
-
+    d = request.get_json()
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO entries(type,customer,phone,model,problem,receive_date,status,amount)
+        INSERT INTO entries
+        (type,customer,phone,model,problem,receive_date,status,amount)
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
     """, (
         d.get("type",""),
@@ -175,14 +108,12 @@ def add_entry():
         d.get("problem",""),
         now(),
         "Received",
-        float(d.get("amount", 0))
+        float(d.get("amount",0))
     ))
     conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"ok": True})
+    cur.close(); conn.close()
+    return jsonify(ok=True)
 
-# LIST
 @app.get("/api/entries")
 @login_required
 def api_entries():
@@ -190,30 +121,28 @@ def api_entries():
     cur = conn.cursor()
     cur.execute("SELECT * FROM entries ORDER BY id DESC")
     rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return jsonify([row_to_obj(r) for r in rows])
+    cur.close(); conn.close()
+    return jsonify(rows)
 
-# STATUS ACTIONS (FIXED)
+# 🔥 FINAL FIX — STATUS + TIMESTAMP
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
-    d = request.get_json(force=True)
-    action = d.get("action", "").lower()
+    action = request.get_json().get("action","").lower()
     t = now()
 
-    mapping = {
+    map_ = {
         "out": ("Out", "out_date"),
         "in": ("In", "in_date"),
         "ready": ("Ready", "ready_date"),
         "reject": ("Rejected", "reject_date"),
-        "delivered": ("Delivered", "delivered_date")
+        "delivered": ("Delivered", "delivered_date"),
     }
 
-    if action not in mapping:
-        return jsonify({"error": "Invalid action"}), 400
+    if action not in map_:
+        return jsonify(error="Invalid action"), 400
 
-    status, field = mapping[action]
+    status, field = map_[action]
 
     conn = get_db()
     cur = conn.cursor()
@@ -222,64 +151,20 @@ def entry_action(eid):
         (status, t, eid)
     )
     conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"ok": True})
+    cur.close(); conn.close()
+    return jsonify(ok=True)
 
-# UPDATE AMOUNT (PRINT FIX)
 @app.post("/api/entries/<int:eid>/amount")
 @login_required
 def update_amount(eid):
-    d = request.get_json(force=True)
-    amount = float(d.get("amount", 0))
-
+    amount = float(request.get_json().get("amount",0))
     conn = get_db()
     cur = conn.cursor()
-    cur.execute(
-        "UPDATE entries SET amount=%s WHERE id=%s",
-        (amount, eid)
-    )
+    cur.execute("UPDATE entries SET amount=%s WHERE id=%s", (amount, eid))
     conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"ok": True})
+    cur.close(); conn.close()
+    return jsonify(ok=True)
 
-# DELETE
-@app.delete("/api/entries/<int:eid>")
-@login_required
-def delete_entry(eid):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM entries WHERE id=%s", (eid,))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"deleted": True})
-
-# OVERDUE
-@app.get("/api/overdue")
-@login_required
-def api_overdue():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM entries WHERE status!='Delivered'")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    res = []
-    now_dt = datetime.datetime.now()
-    for r in rows:
-        try:
-            if (now_dt - datetime.datetime.strptime(
-                r["receive_date"], "%Y-%m-%d %H:%M:%S"
-            )).days > 10:
-                res.append(row_to_obj(r))
-        except:
-            pass
-    return jsonify(res)
-
-# ---------------- PRINT ----------------
 @app.route("/print/<int:eid>")
 @login_required
 def print_receipt(eid):
@@ -287,18 +172,11 @@ def print_receipt(eid):
     cur = conn.cursor()
     cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
     r = cur.fetchone()
-    cur.close()
-    conn.close()
-
+    cur.close(); conn.close()
     if not r:
-        return "Entry not found", 404
-
-    return render_template(
-        "receipt.html",
-        e=r,
-        shop={"name": "IT SOLUTIONS", "addr": "GHATSILA COLLEGE ROAD"}
-    )
+        return "Not found", 404
+    return render_template("receipt.html", e=r)
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
