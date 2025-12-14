@@ -1,56 +1,29 @@
-<script>
-async function loadOverdue() {
-  try {
-    const res = await fetch('/api/overdue', {
-      credentials: 'same-origin'
-    });
+@app.route("/api/overdue")
+@login_required
+def api_overdue():
+    conn = get_db()
+    cur = conn.cursor()
 
-    if (!res.ok) {
-      throw new Error("API error " + res.status);
-    }
+    cur.execute("""
+        SELECT * FROM entries
+        WHERE status != 'Delivered'
+        AND receive_date IS NOT NULL
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
 
-    const rows = await res.json();
-    const tb = document.querySelector('#tbl tbody');
-    tb.innerHTML = '';
+    overdue = []
+    now_dt = datetime.datetime.now()
 
-    if (rows.length === 0) {
-      tb.innerHTML = `
-        <tr>
-          <td colspan="9" class="text-center text-muted">
-            No overdue devices 🎉
-          </td>
-        </tr>`;
-      return;
-    }
+    for r in rows:
+        try:
+            recv = datetime.datetime.strptime(
+                r["receive_date"], "%Y-%m-%d %H:%M:%S"
+            )
+            if (now_dt - recv).days > 10:
+                overdue.append(row_to_obj(r))
+        except:
+            pass
 
-    rows.forEach((r, i) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${i+1}</td>
-        <td>${r.type || ''}</td>
-        <td>${r.customer || ''}</td>
-        <td>${r.phone || ''}</td>
-        <td>${r.model || ''}</td>
-        <td>${r.problem || ''}</td>
-        <td>${r.receive_date || ''}</td>
-        <td>
-          <span class="badge bg-danger">${r.status}</span>
-        </td>
-        <td>
-          <button class="btn btn-sm btn-primary"
-            onclick="window.open('/print/${r.id}','_blank')">
-            Print
-          </button>
-        </td>
-      `;
-      tb.appendChild(tr);
-    });
-
-  } catch (err) {
-    alert("Failed to load overdue list");
-    console.error(err);
-  }
-}
-
-loadOverdue();
-</script>
+    return jsonify(overdue)
