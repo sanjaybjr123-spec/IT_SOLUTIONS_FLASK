@@ -7,7 +7,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
 # ---------------- APP ----------------
-
 app = Flask(__name__, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
 
@@ -15,7 +14,6 @@ def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # ---------------- DATABASE ----------------
-
 def get_db():
     DATABASE_URL = os.environ.get("DATABASE_URL")
     if not DATABASE_URL:
@@ -28,7 +26,6 @@ def get_db():
     )
 
 # ---------------- INIT DB ----------------
-
 def init_db():
     try:
         conn = get_db()
@@ -37,7 +34,11 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
             id SERIAL PRIMARY KEY,
-            type TEXT, customer TEXT, phone TEXT, model TEXT, problem TEXT,
+            type TEXT,
+            customer TEXT,
+            phone TEXT,
+            model TEXT,
+            problem TEXT,
             receive_date TEXT,
             out_date TEXT,
             in_date TEXT,
@@ -52,8 +53,13 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
             id SERIAL PRIMARY KEY,
-            sale_date TEXT, item TEXT, qty REAL, rate REAL,
-            amount REAL, payment_mode TEXT, note TEXT
+            sale_date TEXT,
+            item TEXT,
+            qty REAL,
+            rate REAL,
+            amount REAL,
+            payment_mode TEXT,
+            note TEXT
         )
         """)
 
@@ -74,19 +80,15 @@ def init_db():
             )
 
         conn.commit()
+        cur.close()
+        conn.close()
+
     except Exception as e:
         print("DB init skipped:", e)
-    finally:
-        try:
-            cur.close()
-            conn.close()
-        except:
-            pass
 
 init_db()
 
 # ---------------- AUTH ----------------
-
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -104,8 +106,7 @@ def admin_required(fn):
     return wrapper
 
 # ---------------- LOGIN ----------------
-
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
         u = request.form.get("username")
@@ -133,7 +134,6 @@ def logout():
     return redirect(url_for("login"))
 
 # ---------------- HELPERS ----------------
-
 def row_to_obj(r):
     return {
         "id": r["id"],
@@ -153,7 +153,6 @@ def row_to_obj(r):
     }
 
 # ---------------- DASHBOARD ----------------
-
 @app.route("/")
 @login_required
 def dashboard():
@@ -170,13 +169,23 @@ def dashboard():
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
 
-    # OVERDUE (7 days rule)
+    # OVERDUE COUNT (10 DAYS)
     cur.execute("""
-        SELECT COUNT(*) n FROM entries
-        WHERE status IN ('Received','Out','In')
-        AND receive_date < %s
-    """, ((datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d"),))
-    overdue = cur.fetchone()["n"]
+        SELECT * FROM entries
+        WHERE status!='Delivered'
+        AND receive_date IS NOT NULL
+    """)
+    rows = cur.fetchall()
+
+    overdue = 0
+    now_dt = datetime.datetime.now()
+    for r in rows:
+        try:
+            recv = datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")
+            if (now_dt - recv).days > 10:
+                overdue += 1
+        except:
+            pass
 
     cur.close()
     conn.close()
@@ -189,7 +198,6 @@ def dashboard():
     })
 
 # ---------------- SERVICE ----------------
-
 @app.get("/api/entries")
 @login_required
 def list_entries():
@@ -227,16 +235,12 @@ def add_entry():
     return jsonify({"ok": True})
 
 # ---------------- ENTRY ACTIONS ----------------
-
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
     d = request.get_json(force=True)
     a = d.get("action")
     t = now()
-
-    conn = get_db()
-    cur = conn.cursor()
 
     mapping = {
         "out": ("Out", "out_date"),
@@ -247,19 +251,56 @@ def entry_action(eid):
     }
 
     if a not in mapping:
-        return jsonify({"error": "Invalid action"}), 400
+        return jsonify({"error":"Invalid action"}),400
 
     status, field = mapping[a]
-    cur.execute(f"UPDATE entries SET status=%s, {field}=%s WHERE id=%s",
-                (status, t, eid))
 
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        f"UPDATE entries SET status=%s, {field}=%s WHERE id=%s",
+        (status, t, eid)
+    )
     conn.commit()
     cur.close()
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- DELETE ----------------
+# ---------------- OVERDUE PAGE ----------------
+@app.route("/overdue")
+@login_required
+def overdue_page():
+    return render_template("overdue.html")
 
+# ---------------- OVERDUE API (MAIN FIX) ----------------
+@app.get("/api/overdue")
+@login_required
+def api_overdue():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT * FROM entries
+        WHERE status!='Delivered'
+        AND receive_date IS NOT NULL
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    now_dt = datetime.datetime.now()
+    overdue = []
+
+    for r in rows:
+        try:
+            recv = datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")
+            if (now_dt - recv).days > 10:
+                overdue.append(row_to_obj(r))
+        except:
+            pass
+
+    return jsonify(overdue)
+
+# ---------------- DELETE ----------------
 @app.delete("/api/entries/<int:eid>")
 @login_required
 @admin_required
@@ -273,7 +314,6 @@ def delete_entry(eid):
     return jsonify({"deleted": True})
 
 # ---------------- EXPORT ----------------
-
 def export_csv(query, filename):
     conn = get_db()
     cur = conn.cursor()
@@ -303,6 +343,5 @@ def export_entries():
     return export_csv("SELECT * FROM entries ORDER BY id DESC", "entries_backup.csv")
 
 # ---------------- RUN ----------------
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
