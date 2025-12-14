@@ -1,148 +1,177 @@
-{% extends "base.html" %}{% block content %}
+{% extends "base.html" %}
+{% block content %}
 
-<div class="card p-3">  
-  <div class="d-flex justify-content-between align-items-center">  
-    <div>  
-      <h4 class="mb-0">New Device Entry</h4>  
-      <small>GHATSILA COLLEGE ROAD</small>  
-    </div>  
-    <div class="d-flex gap-2">  
-      <input id="searchBox" class="form-control form-control-sm" placeholder="🔍 Search...">  
-      <a href="/overdue" class="btn btn-warning btn-sm">Overdue List</a>  
-      <button id="refreshBtn" class="btn btn-outline-secondary btn-sm">Refresh</button>  
-    </div>  
-  </div>  
-  <hr>  
-  <div class="row g-2">  
-    <div class="col-md-3">  
-      <label class="form-label">Type</label>  
-      <select id="type" class="form-select"><option>Laptop</option><option>Printer</option><option>Other</option></select>  
-    </div>  
-    <div class="col-md-3"><label class="form-label">Customer</label><input id="customer" class="form-control"></div>  
-    <div class="col-md-3"><label class="form-label">Phone</label><input id="phone" class="form-control"></div>  
-    <div class="col-md-3"><label class="form-label">Model / Serial</label><input id="model" class="form-control"></div>  
-    <div class="col-12"><label class="form-label">Problem</label><textarea id="problem" class="form-control" rows="2"></textarea></div>  
-    <div class="col-md-4"><label class="form-label">Receive Date (auto)</label><input id="receive_date" class="form-control" disabled></div>  
-    <div class="col-md-2 d-flex align-items-end"><button id="saveBtn" class="btn btn-primary w-100">Save</button></div>  
-  </div>  
-</div>  <div class="card p-3 mt-3">  
-  <h5>Device List</h5>  
-  <div class="table-responsive">  
-    <table class="table table-sm align-middle" id="tbl">  
-      <thead class="table-primary">  
-        <tr><th>#</th><th>Type</th><th>Customer</th><th>Phone</th><th>Model</th><th>Problem</th>  
-            <th>Receive</th><th>Out</th><th>In</th><th>Return</th><th>Status</th><th>Actions</th></tr>  
-      </thead>  
-      <tbody></tbody>  
-    </table>  
-  </div>  
-</div>  <!-- Bill Modal (simple) -->  <div class="modal" tabindex="-1" id="billModal">  
-  <div class="modal-dialog">  
-    <div class="modal-content">  
-      <div class="modal-header"><h5 class="modal-title">Billing Details</h5>  
-        <button type="button" class="btn-close" onclick="closeBill()"></button></div>  
-      <div class="modal-body">  
-        <label class="form-label">Parts</label><input id="parts" class="form-control">  
-        <div class="row g-2 mt-1">  
-          <div class="col"><label class="form-label">Parts Amt</label><input id="parts_total" type="number" class="form-control"></div>  
-          <div class="col"><label class="form-label">Service</label><input id="service_charge" type="number" class="form-control"></div>  
-          <div class="col"><label class="form-label">Other</label><input id="other" type="number" class="form-control"></div>  
-        </div>  
-        <label class="form-label mt-1">Payment Mode</label>  
-        <select id="payment_mode" class="form-select"><option>Cash</option><option>Online</option><option>Card</option></select>  
-      </div>  
-      <div class="modal-footer">  
-        <button class="btn btn-secondary" onclick="closeBill()">Cancel</button>  
-        <button class="btn btn-primary" onclick="saveBill()">Save</button>  
-      </div>  
-    </div>  
-  </div>  
-</div>  <style>  
-.overdue{background:#fee2e2!important}  
-.badge-pill{border-radius:999px;padding:.2rem .6rem;font-weight:700}  
-.b-ready{background:#bbf7d0}  
-.b-reject{background:#fecaca;color:#b91c1c}  
-.b-delivered{background:#c7d2fe}  
-.b-in{background:#fde68a}  
-.b-out{background:#bfdbfe}  
-</style>  <script>  
-function fmtBadge(s){  
-  return s==='Ready'?'badge-pill b-ready':  
-         s==='Delivered'?'badge-pill b-delivered':  
-         s==='NOT DONE'?'badge-pill b-reject':  
-         s==='In'?'badge-pill b-in':  
-         s==='Out'?'badge-pill b-out':'badge bg-light';  
-}  
-  
-async function api(p,opt={}){const r=await fetch(p,opt);if(!r.ok)throw new Error(await r.text());return await r.json();}  
-function now(){return new Date().toLocaleString();}  
-const recv=document.getElementById('receive_date');recv.value=now();setInterval(()=>recv.value=now(),60000);  
-  
-document.getElementById('saveBtn').onclick=async()=>{  
-  const d={type:type.value,customer:customer.value,phone:phone.value,model:model.value,problem:problem.value};  
-  await fetch('/api/entries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});  
-  load();  
-};  
-  
-let ALL_ROWS=[]; let billForId=null;  
-async function load(){ const rs=await api('/api/entries'); ALL_ROWS=rs; render(rs); }  
-function render(rows){  
-  const tb=document.querySelector('#tbl tbody'); tb.innerHTML='';  
-  rows.forEach((r,i)=>{  
-    let od=''; if(r.status!=='Delivered' && r.receive_date){ const diff=(new Date()-new Date(r.receive_date))/(1000*60*60*24); if(diff>10) od='overdue';}  
-    const tr=document.createElement('tr'); tr.className=od;  
-    tr.innerHTML=`<td>${i+1}</td><td>${r.type||''}</td><td>${r.customer||''}</td><td>${r.phone||''}</td>  
-    <td>${r.model||''}</td><td>${r.problem||''}</td>  
-    <td>${r.receive_date||''}</td><td>${r.out_date||''}</td><td>${r.in_date||''}</td><td>${r.return_date||''}</td>  
-    <td><span class="${fmtBadge(r.status||'')}">${r.status||''}</span></td>  
-    <td class="text-nowrap">  
-  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'out')">Out</button>  
-  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'in')">In</button>  
-  <button class="btn btn-sm btn-outline-secondary" onclick="act(${r.id},'ready')">Ready</button>  
-  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'delivered')">Delivered</button>  
-  <button class="btn btn-sm btn-outline-danger" onclick="act(${r.id},'reject')">Reject</button>  
-  <button class="btn btn-sm btn-outline-primary" onclick="openBill(${r.id})">Bill</button>  
-  <button class="btn btn-sm btn-outline-primary" onclick="window.open('/print/${r.id}','_blank')">Print</button>  
+<div class="card p-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <h4 class="mb-0">New Device Entry</h4>
+      <small>GHATSILA COLLEGE ROAD</small>
+    </div>
+    <div class="d-flex gap-2">
+      <input id="searchBox" class="form-control form-control-sm" placeholder="🔍 Search...">
+      <a href="/overdue" class="btn btn-warning btn-sm">Overdue List</a>
+      <button id="refreshBtn" class="btn btn-outline-secondary btn-sm">Refresh</button>
+    </div>
+  </div>
+  <hr>
+
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">Type</label>
+      <select id="type" class="form-select">
+        <option>Laptop</option>
+        <option>Printer</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Customer</label>
+      <input id="customer" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Phone</label>
+      <input id="phone" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Model / Serial</label>
+      <input id="model" class="form-control">
+    </div>
+    <div class="col-12">
+      <label class="form-label">Problem</label>
+      <textarea id="problem" class="form-control" rows="2"></textarea>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Receive Date (auto)</label>
+      <input id="receive_date" class="form-control" disabled>
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+      <button id="saveBtn" class="btn btn-primary w-100">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="card p-3 mt-3">
+  <h5>Device List</h5>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle" id="tbl">
+      <thead class="table-primary">
+        <tr>
+          <th>#</th><th>Type</th><th>Customer</th><th>Phone</th>
+          <th>Model</th><th>Problem</th>
+          <th>Receive</th><th>Out</th><th>In</th><th>Return</th>
+          <th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+.overdue{background:#fee2e2!important}
+.badge-pill{border-radius:999px;padding:.2rem .6rem;font-weight:700}
+.b-ready{background:#bbf7d0}
+.b-reject{background:#fecaca;color:#b91c1c}
+.b-delivered{background:#c7d2fe}
+.b-in{background:#fde68a}
+.b-out{background:#bfdbfe}
+</style>
+
+{% raw %}
+<script>
+function fmtBadge(s){
+  return s==='Ready'?'badge-pill b-ready':
+         s==='Delivered'?'badge-pill b-delivered':
+         s==='NOT DONE'?'badge-pill b-reject':
+         s==='In'?'badge-pill b-in':
+         s==='Out'?'badge-pill b-out':'badge bg-light';
+}
+
+async function api(p,opt={}){const r=await fetch(p,opt);if(!r.ok)throw new Error(await r.text());return await r.json();}
+function now(){return new Date().toLocaleString();}
+const recv=document.getElementById('receive_date');
+recv.value=now(); setInterval(()=>recv.value=now(),60000);
+
+document.getElementById('saveBtn').onclick=async()=>{
+  const d={type:type.value,customer:customer.value,phone:phone.value,model:model.value,problem:problem.value};
+  await fetch('/api/entries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  load();
+};
+
+let ALL_ROWS=[]; let billForId=null;
+async function load(){ const rs=await api('/api/entries'); ALL_ROWS=rs; render(rs); }
+
+function render(rows){
+  const tb=document.querySelector('#tbl tbody'); tb.innerHTML='';
+  rows.forEach((r,i)=>{
+    let od='';
+    if(r.status!=='Delivered' && r.receive_date){
+      const diff=(new Date()-new Date(r.receive_date))/(1000*60*60*24);
+      if(diff>10) od='overdue';
+    }
+    const tr=document.createElement('tr'); tr.className=od;
+    tr.innerHTML=`
+<td>${i+1}</td>
+<td>${r.type||''}</td>
+<td>${r.customer||''}</td>
+<td>${r.phone||''}</td>
+<td>${r.model||''}</td>
+<td>${r.problem||''}</td>
+<td>${r.receive_date||''}</td>
+<td>${r.out_date||''}</td>
+<td>${r.in_date||''}</td>
+<td>${r.return_date||''}</td>
+<td><span class="${fmtBadge(r.status||'')}">${r.status||''}</span></td>
+<td class="text-nowrap">
+  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'out')">Out</button>
+  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'in')">In</button>
+  <button class="btn btn-sm btn-outline-secondary" onclick="act(${r.id},'ready')">Ready</button>
+  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'delivered')">Delivered</button>
+  <button class="btn btn-sm btn-outline-danger" onclick="act(${r.id},'reject')">Reject</button>
+  <button class="btn btn-sm btn-outline-primary" onclick="openBill(${r.id})">Bill</button>
+  <button class="btn btn-sm btn-outline-primary" onclick="window.open('/print/${r.id}','_blank')">Print</button>
 
   ${r.status === 'Delivered' && r.whatsapp ? `
-    <a href="${r.whatsapp}" target="_blank"
-       class="btn btn-sm btn-success">
-       📲 WhatsApp
-    </a>
+    <a href="${r.whatsapp}" target="_blank" class="btn btn-sm btn-success">📲 WhatsApp</a>
   ` : ''}
 
-  <button class="btn btn-sm btn-outline-dark"
-    onclick="delE(${r.id})">Delete</button>
-</td>
-    tb.appendChild(tr);  
-  });  
-}  
-document.getElementById('searchBox').addEventListener('input',e=>{  
-  const t=e.target.value.toLowerCase();  
-  render(ALL_ROWS.filter(r=>Object.values(r).some(v=>String(v||'').toLowerCase().includes(t))));  
-});  
-document.getElementById('refreshBtn').onclick=load;  
-  
-function confirmAct(id,action){  
-  const label = action==='out'?'OUT (send outside)': action==='in'?'IN (came back)':'DELIVERED (handed to customer)';  
-  if(confirm(`Are you sure you want to mark this product as ${label}?`)) act(id,action);  
-}  
-async function act(id,action){  
-  await fetch(`/api/entries/${id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});  
-  load();  
-}  
-async function delE(id){  
-  if(confirm('Delete this record?')){ await fetch(`/api/entries/${id}`,{method:'DELETE'}); load(); }  
-}  
-  
-// Bill modal (vanilla)  
-function openBill(id){ billForId=id; document.getElementById('billModal').style.display='block'; }  
-function closeBill(){ document.getElementById('billModal').style.display='none'; }  
-async function saveBill(){  
-  const d={parts:parts.value,parts_total:parts_total.value,service_charge:service_charge.value,other:other.value,payment_mode:payment_mode.value};  
-  await fetch(`/api/entries/${billForId}/bill`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});  
-  closeBill(); load();  
-}  
-  
-load();  
-</script>  {% endblock %}
+  <button class="btn btn-sm btn-outline-dark" onclick="delE(${r.id})">Delete</button>
+</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+document.getElementById('searchBox').addEventListener('input',e=>{
+  const t=e.target.value.toLowerCase();
+  render(ALL_ROWS.filter(r=>Object.values(r).some(v=>String(v||'').toLowerCase().includes(t))));
+});
+document.getElementById('refreshBtn').onclick=load;
+
+function confirmAct(id,action){
+  const label = action==='out'?'OUT': action==='in'?'IN':'DELIVERED';
+  if(confirm(`Mark as ${label}?`)) act(id,action);
+}
+async function act(id,action){
+  await fetch(`/api/entries/${id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+  load();
+}
+async function delE(id){
+  if(confirm('Delete this record?')){
+    await fetch(`/api/entries/${id}`,{method:'DELETE'});
+    load();
+  }
+}
+
+function openBill(id){ billForId=id; document.getElementById('billModal').style.display='block'; }
+function closeBill(){ document.getElementById('billModal').style.display='none'; }
+async function saveBill(){
+  const d={parts:parts.value,parts_total:parts_total.value,service_charge:service_charge.value,other:other.value,payment_mode:payment_mode.value};
+  await fetch(`/api/entries/${billForId}/bill`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  closeBill(); load();
+}
+
+load();
+</script>
+{% endraw %}
+
+{% endblock %}
