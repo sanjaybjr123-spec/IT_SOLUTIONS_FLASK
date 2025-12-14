@@ -115,7 +115,9 @@ def dashboard():
     now_dt = datetime.datetime.now()
     for r in rows:
         try:
-            if (now_dt - datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")).days > 10:
+            if (now_dt - datetime.datetime.strptime(
+                r["receive_date"], "%Y-%m-%d %H:%M:%S"
+            )).days > 10:
                 overdue += 1
         except:
             pass
@@ -145,9 +147,9 @@ def overdue_page():
 @login_required
 def add_entry():
     d = request.get_json(force=True)
+
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("""
         INSERT INTO entries(type,customer,phone,model,problem,receive_date,status)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
@@ -177,7 +179,7 @@ def api_entries():
     conn.close()
     return jsonify([row_to_obj(r) for r in rows])
 
-# STATUS ACTIONS
+# STATUS ACTIONS (IN / OUT / READY / REJECT / DELIVERED)
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
@@ -236,11 +238,36 @@ def api_overdue():
     now_dt = datetime.datetime.now()
     for r in rows:
         try:
-            if (now_dt - datetime.datetime.strptime(r["receive_date"], "%Y-%m-%d %H:%M:%S")).days > 10:
+            if (now_dt - datetime.datetime.strptime(
+                r["receive_date"], "%Y-%m-%d %H:%M:%S"
+            )).days > 10:
                 res.append(row_to_obj(r))
         except:
             pass
     return jsonify(res)
+
+# ---------------- PRINT RECEIPT (FIXED) ----------------
+@app.route("/print/<int:eid>")
+@login_required
+def print_receipt(eid):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
+    r = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not r:
+        return "Entry not found", 404
+
+    return render_template(
+        "receipt.html",
+        e=r,
+        shop={
+            "name": "IT SOLUTIONS",
+            "addr": "GHATSILA COLLEGE ROAD"
+        }
+    )
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
