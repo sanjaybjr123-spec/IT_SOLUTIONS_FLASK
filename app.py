@@ -13,6 +13,8 @@ def now():
 
 # ---------------- DATABASE ----------------
 def get_db():
+    if "DATABASE_URL" not in os.environ:
+        raise RuntimeError("DATABASE_URL not set")
     return psycopg2.connect(
         os.environ["DATABASE_URL"],
         sslmode="require",
@@ -109,7 +111,7 @@ def row_to_obj(r):
         "problem": r["problem"],
         "receive_date": r["receive_date"],
         "status": r["status"],
-        "amount": r.get("amount", 0)
+        "amount": float(r.get("amount", 0))
     }
 
 # ---------------- DASHBOARD ----------------
@@ -192,12 +194,12 @@ def api_entries():
     conn.close()
     return jsonify([row_to_obj(r) for r in rows])
 
-# STATUS ACTIONS
+# STATUS ACTIONS (FIXED)
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
     d = request.get_json(force=True)
-    action = d.get("action")
+    action = d.get("action", "").lower()
     t = now()
 
     mapping = {
@@ -218,6 +220,24 @@ def entry_action(eid):
     cur.execute(
         f"UPDATE entries SET status=%s, {field}=%s WHERE id=%s",
         (status, t, eid)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
+
+# UPDATE AMOUNT (PRINT FIX)
+@app.post("/api/entries/<int:eid>/amount")
+@login_required
+def update_amount(eid):
+    d = request.get_json(force=True)
+    amount = float(d.get("amount", 0))
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE entries SET amount=%s WHERE id=%s",
+        (amount, eid)
     )
     conn.commit()
     cur.close()
@@ -276,10 +296,7 @@ def print_receipt(eid):
     return render_template(
         "receipt.html",
         e=r,
-        shop={
-            "name": "IT SOLUTIONS",
-            "addr": "GHATSILA COLLEGE ROAD"
-        }
+        shop={"name": "IT SOLUTIONS", "addr": "GHATSILA COLLEGE ROAD"}
     )
 
 # ---------------- RUN ----------------
