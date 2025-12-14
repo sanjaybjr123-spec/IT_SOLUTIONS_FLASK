@@ -5,26 +5,17 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="mb-0">Dashboard</h4>
 
-  <!-- RIGHT ACTIONS -->
-  <div class="d-flex gap-2">
-    {% if session.role == 'admin' %}
-      <a href="/export/entries" class="btn btn-sm btn-outline-dark">
-        ⬇ Export Backup
-      </a>
-    {% endif %}
-
-    <a href="/logout" class="btn btn-sm btn-danger">
-      Logout
-    </a>
-  </div>
+  <!-- LOGOUT BUTTON -->
+  <a href="/logout"
+     class="btn btn-sm btn-danger">
+     Logout
+  </a>
 </div>
 
 <!-- KPI CARDS -->
 <div class="row g-3">
-
-  <!-- TODAY SALES -->
   <div class="col-md-3">
-    <div class="card p-3 h-100">
+    <div class="card p-3">
       <div class="text-muted">Today's Sales</div>
       <div class="fs-3 fw-bold">
         ₹ {{ '%.2f'|format(kp.today_sales) }}
@@ -32,9 +23,8 @@
     </div>
   </div>
 
-  <!-- PENDING -->
   <div class="col-md-3">
-    <div class="card p-3 h-100">
+    <div class="card p-3">
       <div class="text-muted">Pending Devices</div>
       <div class="fs-3 fw-bold">
         {{ kp.pending }}
@@ -42,33 +32,23 @@
     </div>
   </div>
 
-  <!-- OVERDUE (CLICKABLE) -->
   <div class="col-md-3">
-    <a href="/overdue" style="text-decoration:none">
-      <div class="card p-3 h-100 border-danger">
-        <div class="text-muted">
-          Overdue (&gt;10 days)
-        </div>
-        <div class="fs-3 fw-bold text-danger">
-          {{ kp.overdue }}
-        </div>
-        <small class="text-danger">
-          View overdue list →
-        </small>
+    <div class="card p-3">
+      <div class="text-muted">Overdue (&gt;10 days)</div>
+      <div class="fs-3 fw-bold text-danger">
+        {{ kp.overdue }}
       </div>
-    </a>
+    </div>
   </div>
 
-  <!-- LEDGER -->
   <div class="col-md-3">
-    <div class="card p-3 h-100">
+    <div class="card p-3">
       <div class="text-muted">Ledger Balance (Net)</div>
       <div class="fs-3 fw-bold">
         ₹ {{ '%.2f'|format(kp.ledger_bal) }}
       </div>
     </div>
   </div>
-
 </div>
 
 <!-- QUICK ACTIONS -->
@@ -77,25 +57,24 @@
 
   <div class="d-flex flex-wrap gap-2">
 
-    <!-- STAFF + ADMIN -->
+    <!-- COMMON FOR ADMIN + STAFF -->
     <a href="/service" class="btn btn-primary">
       New Service Entry
     </a>
 
-    <a href="/overdue" class="btn btn-warning">
-      Overdue List
-    </a>
-
-    <!-- ADMIN ONLY -->
+    <!-- ADMIN ONLY BUTTONS -->
     {% if session.role == 'admin' %}
-      <a href="/export/entries" class="btn btn-outline-dark">
-        Backup Services
+      <a href="/sales" class="btn btn-success">
+        Add Sale
       </a>
-      <a href="/export/sales" class="btn btn-outline-success">
-        Backup Sales
+      <a href="/ledger" class="btn btn-secondary">
+        Ledger Entry
       </a>
-      <a href="/export/users" class="btn btn-outline-secondary">
-        Backup Users
+      <a href="/customers" class="btn btn-info">
+        Add Customer
+      </a>
+      <a href="/overdue" class="btn btn-warning">
+        View Overdue
       </a>
     {% endif %}
 
