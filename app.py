@@ -27,6 +27,7 @@ def init_db():
         conn = get_db()
         cur = conn.cursor()
 
+        # main table
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
           id SERIAL PRIMARY KEY,
@@ -36,12 +37,23 @@ def init_db():
           model TEXT,
           problem TEXT,
           receive_date TEXT,
+          out_date TEXT,
+          in_date TEXT,
+          ready_date TEXT,
           return_date TEXT,
+          reject_date TEXT,
           status TEXT,
           bill_json TEXT
         )
         """)
 
+        # auto add missing columns (SAFE)
+        cur.execute("ALTER TABLE entries ADD COLUMN IF NOT EXISTS out_date TEXT")
+        cur.execute("ALTER TABLE entries ADD COLUMN IF NOT EXISTS in_date TEXT")
+        cur.execute("ALTER TABLE entries ADD COLUMN IF NOT EXISTS ready_date TEXT")
+        cur.execute("ALTER TABLE entries ADD COLUMN IF NOT EXISTS reject_date TEXT")
+
+        # sales
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
           id SERIAL PRIMARY KEY,
@@ -55,6 +67,7 @@ def init_db():
         )
         """)
 
+        # customers
         cur.execute("""
         CREATE TABLE IF NOT EXISTS customers(
           id SERIAL PRIMARY KEY,
@@ -82,7 +95,11 @@ def row_to_obj(r):
         "model": r["model"],
         "problem": r["problem"],
         "receive_date": r["receive_date"],
-        "return_date": r["return_date"],
+        "out_date": r.get("out_date"),
+        "in_date": r.get("in_date"),
+        "ready_date": r.get("ready_date"),
+        "return_date": r.get("return_date"),
+        "reject_date": r.get("reject_date"),
         "status": r["status"],
         "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
     }
@@ -152,7 +169,7 @@ def add_entry():
     conn.close()
     return jsonify({"ok": True}), 201
 
-# ---------------- ENTRY ACTIONS (FIXED) ----------------
+# ---------------- ENTRY ACTIONS (FINAL FIX) ----------------
 @app.post("/api/entries/<int:eid>/action")
 def entry_action(eid):
     d = request.get_json(force=True)
@@ -163,18 +180,30 @@ def entry_action(eid):
     cur = conn.cursor()
 
     if action == "out":
-        cur.execute("UPDATE entries SET status='Out' WHERE id=%s", (eid,))
+        cur.execute(
+            "UPDATE entries SET status='Out', out_date=%s WHERE id=%s",
+            (t, eid)
+        )
     elif action == "in":
-        cur.execute("UPDATE entries SET status='In' WHERE id=%s", (eid,))
+        cur.execute(
+            "UPDATE entries SET status='In', in_date=%s WHERE id=%s",
+            (t, eid)
+        )
     elif action == "ready":
-        cur.execute("UPDATE entries SET status='Ready' WHERE id=%s", (eid,))
+        cur.execute(
+            "UPDATE entries SET status='Ready', ready_date=%s WHERE id=%s",
+            (t, eid)
+        )
     elif action == "delivered":
         cur.execute(
             "UPDATE entries SET status='Delivered', return_date=%s WHERE id=%s",
             (t, eid)
         )
     elif action == "reject":
-        cur.execute("UPDATE entries SET status='Rejected' WHERE id=%s", (eid,))
+        cur.execute(
+            "UPDATE entries SET status='Rejected', reject_date=%s WHERE id=%s",
+            (t, eid)
+        )
     else:
         cur.close()
         conn.close()
@@ -185,7 +214,7 @@ def entry_action(eid):
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- SAVE BILL (Cash / UPI / Card) ----------------
+# ---------------- SAVE BILL ----------------
 @app.post("/api/entries/<int:eid>/bill")
 def save_bill(eid):
     d = request.get_json(force=True)
@@ -195,10 +224,10 @@ def save_bill(eid):
         "parts_total": float(d.get("parts_total") or 0),
         "service_charge": float(d.get("service_charge") or 0),
         "other": float(d.get("other") or 0),
-        "payment_mode": d.get("payment_mode","Cash")
+        "payment_mode": d.get("payment_mode","Cash")  # Cash / UPI / Card
     }
 
-    total_amount = bill["parts_total"] + bill["service_charge"] + bill["other"]
+    total = bill["parts_total"] + bill["service_charge"] + bill["other"]
 
     conn = get_db()
     cur = conn.cursor()
@@ -215,8 +244,8 @@ def save_bill(eid):
         now(),
         "Service Bill",
         1,
-        total_amount,
-        total_amount,
+        total,
+        total,
         bill["payment_mode"],
         f"Entry ID {eid}"
     ))
@@ -226,7 +255,7 @@ def save_bill(eid):
     conn.close()
     return jsonify({"ok": True})
 
-# ---------------- DELETE ENTRY ----------------
+# ---------------- DELETE ----------------
 @app.delete("/api/entries/<int:eid>")
 def delete_entry(eid):
     conn = get_db()
@@ -237,7 +266,7 @@ def delete_entry(eid):
     conn.close()
     return jsonify({"deleted": True})
 
-# ---------------- PRINT RECEIPT ----------------
+# ---------------- PRINT ----------------
 @app.get("/print/<int:eid>")
 def print_receipt(eid):
     conn = get_db()
@@ -253,38 +282,8 @@ def print_receipt(eid):
     return render_template(
         "receipt.html",
         e=row_to_obj(r),
-        shop={
-            "name": "IT SOLUTIONS",
-            "addr": "GHATSILA COLLEGE ROAD"
-        }
+        shop={"name": "IT SOLUTIONS", "addr": "GHATSILA COLLEGE ROAD"}
     )
-
-# ---------------- CSV EXPORT ----------------
-def export_csv(query, filename):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(query)
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    si = StringIO()
-    writer = csv.writer(si)
-
-    if rows:
-        writer.writerow(rows[0].keys())
-        for r in rows:
-            writer.writerow(r.values())
-
-    return Response(
-        si.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
-
-@app.get("/export/entries")
-def export_entries():
-    return export_csv("SELECT * FROM entries ORDER BY id DESC", "entries.csv")
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
