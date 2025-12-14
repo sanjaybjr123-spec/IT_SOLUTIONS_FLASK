@@ -149,6 +149,32 @@ def row_to_obj(r):
         "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
     }
 
+# ---------------- EXPORT ----------------
+@app.get("/export/entries")
+@login_required
+def export_entries():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM entries ORDER BY id DESC")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    si = StringIO()
+    cw = csv.writer(si)
+
+    if rows:
+        cw.writerow(rows[0].keys())
+        for r in rows:
+            cw.writerow(r.values())
+
+    output = si.getvalue()
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=entries.csv"}
+    )
+
 # ---------------- DASHBOARD ----------------
 @app.route("/")
 @login_required
@@ -214,6 +240,34 @@ def add_entry():
     cur.close()
     conn.close()
     return jsonify({"ok": True})
+
+# ---------------- OVERDUE ----------------
+@app.route("/overdue")
+@login_required
+def overdue_page():
+    return render_template("overdue.html")
+
+
+@app.get("/api/overdue")
+@login_required
+def overdue_list():
+    conn = get_db()
+    cur = conn.cursor()
+
+    ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+
+    cur.execute("""
+        SELECT * FROM entries
+        WHERE status!='Delivered'
+        AND receive_date < %s
+        ORDER BY receive_date ASC
+    """, (ten_days_ago,))
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return jsonify([row_to_obj(r) for r in rows])
 
 # ---------------- ENTRY ACTIONS ----------------
 @app.post("/api/entries/<int:eid>/action")
