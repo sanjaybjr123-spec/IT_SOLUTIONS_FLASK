@@ -439,6 +439,6 @@ def bill_pdf(eid):
         headers={"Content-Disposition": f"inline; filename=bill_{eid}.pdf"}
     )
 
-# ---------------- RUN ----------------
+# ---------------- RUN ---------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
