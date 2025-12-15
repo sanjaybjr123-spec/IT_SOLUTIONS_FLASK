@@ -156,6 +156,21 @@ Model: {entry['model']}
     text = urllib.parse.quote(msg)
     phone = entry["phone"].replace("+","").replace(" ","")
     return f"https://wa.me/91{phone}?text={text}"
+def whatsapp_pdf_link(entry):
+    pdf_url = f"https://it-solutions-flask.onrender.com/pdf/{entry['id']}"
+    msg = f"""
+🧾 IT SOLUTIONS
+
+Your bill is ready.
+
+📄 Download PDF:
+{pdf_url}
+
+Thank you!
+"""
+    text = urllib.parse.quote(msg)
+    phone = entry["phone"].replace("+","").replace(" ","")
+    return f"https://wa.me/91{phone}?text={text}"
 
 # ---------------- EXPORT ----------------
 @app.get("/export/entries")
@@ -229,7 +244,7 @@ def list_entries():
         bill = obj["bill"]
         total = bill.get("parts_total",0) + bill.get("service_charge",0) + bill.get("other",0)
 
-        obj["whatsapp"] = whatsapp_bill_link(obj, total) if obj["status"]=="Delivered" and obj["phone"] else ""
+        obj["whatsapp"] = whatsapp_pdf_link(obj) if obj["status"]=="Delivered" and obj["phone"] else ""
         data.append(obj)
 
     return jsonify(data)
@@ -371,6 +386,57 @@ def print_receipt(eid):
 
     return render_template("receipt.html", e=row_to_obj(r),
         shop={"name":"IT SOLUTIONS","addr":"GHATSILA COLLEGE ROAD"}
+    )
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+import io
+
+@app.get("/pdf/<int:eid>")
+@login_required
+def bill_pdf(eid):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
+    r = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not r:
+        abort(404)
+
+    bill = json.loads(r["bill_json"] or "{}")
+    total = bill.get("parts_total",0) + bill.get("service_charge",0) + bill.get("other",0)
+
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+    w, h = A4
+
+    p.setFont("Helvetica-Bold", 16)
+    p.drawCentredString(w/2, h-50, "IT SOLUTIONS")
+
+    p.setFont("Helvetica", 10)
+    y = h-100
+    p.drawString(50, y, f"Customer: {r['customer']}")
+    p.drawString(50, y-20, f"Phone: {r['phone']}")
+    p.drawString(50, y-40, f"Model: {r['model']}")
+    p.drawString(50, y-60, f"Status: {r['status']}")
+
+    y -= 120
+    p.drawString(50, y, f"Parts Amount: ₹{bill.get('parts_total',0)}")
+    p.drawString(50, y-20, f"Service Charge: ₹{bill.get('service_charge',0)}")
+    p.drawString(50, y-40, f"Other: ₹{bill.get('other',0)}")
+
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, y-70, f"TOTAL: ₹{total}")
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+
+    return Response(
+        buffer,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=bill_{eid}.pdf"}
     )
 
 # ---------------- RUN ----------------
