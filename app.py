@@ -68,7 +68,7 @@ def init_db():
             cur.execute("""
                 INSERT INTO users(username, password_hash, role)
                 VALUES (%s,%s,%s)
-            """, ("admin", generate_password_hash("admin@123"), "admin"))
+            """, ("admin", generate_password_hash("admin@2025"), "admin"))
 
         conn.commit()
         cur.close()
