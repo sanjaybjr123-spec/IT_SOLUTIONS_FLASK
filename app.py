@@ -157,7 +157,7 @@ Model: {entry['model']}
     phone = entry["phone"].replace("+","").replace(" ","")
     return f"https://wa.me/91{phone}?text={text}"
 def whatsapp_pdf_link(entry):
-    pdf_url = f"https://it-solutions-flask.onrender.com/pdf/{entry['id']}"
+    pdf_url = f"https://it-solutions-flask.onrender.com/print/{entry['id']}"
     msg = f"""
 🧾 IT SOLUTIONS
 
