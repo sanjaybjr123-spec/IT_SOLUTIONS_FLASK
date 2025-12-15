@@ -67,6 +67,48 @@
   </div>
 </div>
 
+<!-- Bill Modal -->
+<div id="billModal"
+     style="display:none; position:fixed; inset:0;
+            background:rgba(0,0,0,.6); z-index:9999;">
+  <div style="background:#fff; max-width:500px; margin:12% auto;
+              padding:15px; border-radius:6px;">
+
+    <h5>Billing Details</h5>
+
+    <label class="form-label">Parts</label>
+    <input id="parts" class="form-control">
+
+    <div class="row g-2 mt-2">
+      <div class="col">
+        <label class="form-label">Parts Amount</label>
+        <input id="parts_total" type="number" class="form-control">
+      </div>
+      <div class="col">
+        <label class="form-label">Service Charge</label>
+        <input id="service_charge" type="number" class="form-control">
+      </div>
+      <div class="col">
+        <label class="form-label">Other</label>
+        <input id="other" type="number" class="form-control">
+      </div>
+    </div>
+
+    <label class="form-label mt-2">Payment Mode</label>
+    <select id="payment_mode" class="form-select">
+      <option>Cash</option>
+      <option>UPI</option>
+      <option>Card</option>
+    </select>
+
+    <div class="text-end mt-3">
+      <button class="btn btn-secondary btn-sm" onclick="closeBill()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveBill()">Save</button>
+    </div>
+
+  </div>
+</div>
+
 <style>
 .overdue{background:#fee2e2!important}
 .badge-pill{border-radius:999px;padding:.2rem .6rem;font-weight:700}
@@ -75,17 +117,7 @@
 .b-delivered{background:#c7d2fe}
 .b-in{background:#fde68a}
 .b-out{background:#bfdbfe}
-.modal {
-  display: none !important;
-  position: fixed;
-  z-index: 9999;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-}
 
-.modal.show {
-  display: block !important;
-}
 
 .modal-dialog {
   margin: 12% auto;
@@ -180,13 +212,11 @@ async function delE(id){
 
 function openBill(id){
   billForId = id;
-  const modal = document.getElementById('billModal');
-  modal.classList.add('show');
+  document.getElementById('billModal').style.display = 'block';
 }
 
 function closeBill(){
-  const modal = document.getElementById('billModal');
-  modal.classList.remove('show');
+  document.getElementById('billModal').style.display = 'none';
 }
 async function saveBill(){
   const d={parts:parts.value,parts_total:parts_total.value,service_charge:service_charge.value,other:other.value,payment_mode:payment_mode.value};
