@@ -68,7 +68,7 @@ def init_db():
             cur.execute("""
                 INSERT INTO users(username, password_hash, role)
                 VALUES (%s,%s,%s)
-            """, ("admin", generate_password_hash("admin@2025"), "admin"))
+            """, ("admin", generate_password_hash("admin@123"), "admin"))
 
         conn.commit()
         cur.close()
@@ -122,7 +122,42 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+@app.route("/change-password", methods=["GET", "POST"])
 
+@login_required
+def change_password():
+    if request.method == "POST":
+        old = request.form.get("old")
+        new = request.form.get("new")
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT password_hash FROM users WHERE id=%s", (session["user_id"],))
+        user = cur.fetchone()
+
+        if not user or not check_password_hash(user["password_hash"], old):
+            cur.close()
+            conn.close()
+            return "Old password wrong"
+
+        cur.execute(
+            "UPDATE users SET password_hash=%s WHERE id=%s",
+            (generate_password_hash(new), session["user_id"])
+        )
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return "Password changed successfully"
+
+    return """
+    <form method="post">
+        <input name="old" placeholder="Old password"><br>
+        <input name="new" placeholder="New password"><br>
+        <button>Change Password</button>
+    </form>
+    """
 # ---------------- HELPERS ----------------
 def row_to_obj(r):
     return {
