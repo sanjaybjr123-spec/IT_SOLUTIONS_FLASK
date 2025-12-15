@@ -373,7 +373,6 @@ def delete_entry(eid):
 
 # ---------------- PRINT ----------------
 @app.get("/print/<int:eid>")
-@login_required
 def print_receipt(eid):
     conn = get_db()
     cur = conn.cursor()
@@ -392,7 +391,6 @@ from reportlab.pdfgen import canvas
 import io
 
 @app.get("/pdf/<int:eid>")
-@login_required
 def bill_pdf(eid):
     conn = get_db()
     cur = conn.cursor()
