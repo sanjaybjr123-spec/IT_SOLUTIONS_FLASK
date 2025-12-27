@@ -334,14 +334,37 @@ def ink_page():
 @app.get("/api/ink")
 @login_required
 def ink_list():
-    conn=get_db();cur=conn.cursor()
+    conn = get_db()
+    cur = conn.cursor()
+
+    # ✅ Ensure tables exist (safe for free DB)
     cur.execute("""
-        SELECT m.id,m.model,COALESCE(s.qty,0) qty
-        FROM ink_master m LEFT JOIN ink_stock s ON m.id=s.ink_id
+        CREATE TABLE IF NOT EXISTS ink_master(
+            id SERIAL PRIMARY KEY,
+            model TEXT UNIQUE
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ink_stock(
+            ink_id INTEGER PRIMARY KEY,
+            qty INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+    """)
+
+    # ✅ Now fetch data safely
+    cur.execute("""
+        SELECT m.id, m.model, COALESCE(s.qty,0) qty
+        FROM ink_master m
+        LEFT JOIN ink_stock s ON m.id = s.ink_id
         ORDER BY m.model
     """)
-    r=cur.fetchall();cur.close();conn.close()
-    return jsonify(r)
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify(rows)
 
 @app.post("/api/ink/in")
 @login_required
