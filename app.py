@@ -1,7 +1,4 @@
-from flask import (
-    Flask, render_template, request, jsonify,
-    abort, Response, session, redirect, url_for
-)
+from flask import Flask, render_template, request, jsonify, abort, Response, session, redirect, url_for
 import os, json, datetime, csv
 from io import StringIO
 import psycopg2
@@ -9,9 +6,6 @@ import psycopg2.extras
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import urllib.parse
-import io
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
 
 # ---------------- APP ----------------
 app = Flask(__name__, template_folder="templates")
@@ -39,51 +33,42 @@ def init_db():
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
-            id SERIAL PRIMARY KEY,
-            type TEXT,
-            customer TEXT,
-            phone TEXT,
-            model TEXT,
-            problem TEXT,
-            receive_date TEXT,
-            out_date TEXT,
-            in_date TEXT,
-            ready_date TEXT,
-            return_date TEXT,
-            reject_date TEXT,
-            status TEXT,
-            bill_json TEXT
+          id SERIAL PRIMARY KEY,
+          type TEXT, customer TEXT, phone TEXT, model TEXT, problem TEXT,
+          receive_date TEXT,
+          out_date TEXT,
+          in_date TEXT,
+          ready_date TEXT,
+          return_date TEXT,
+          reject_date TEXT,
+          status TEXT,
+          bill_json TEXT
         )
         """)
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
-            id SERIAL PRIMARY KEY,
-            sale_date TEXT,
-            item TEXT,
-            qty REAL,
-            rate REAL,
-            amount REAL,
-            payment_mode TEXT,
-            note TEXT
+          id SERIAL PRIMARY KEY,
+          sale_date TEXT, item TEXT, qty REAL, rate REAL,
+          amount REAL, payment_mode TEXT, note TEXT
         )
         """)
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS users(
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE,
-            password_hash TEXT,
-            role TEXT
+          id SERIAL PRIMARY KEY,
+          username TEXT UNIQUE,
+          password_hash TEXT,
+          role TEXT
         )
         """)
 
-        cur.execute("SELECT COUNT(*) c FROM users")
+        cur.execute("SELECT COUNT(*) AS c FROM users")
         if cur.fetchone()["c"] == 0:
-            cur.execute(
-                "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
-                ("admin", generate_password_hash("admin@123"), "admin")
-            )
+            cur.execute("""
+                INSERT INTO users(username, password_hash, role)
+                VALUES (%s,%s,%s)
+            """, ("admin", generate_password_hash("admin@123"), "admin"))
 
         conn.commit()
         cur.close()
@@ -96,26 +81,26 @@ init_db()
 # ---------------- AUTH ----------------
 def login_required(fn):
     @wraps(fn)
-    def wrapper(*a, **kw):
+    def wrapper(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("login"))
-        return fn(*a, **kw)
+        return fn(*args, **kwargs)
     return wrapper
 
 def admin_required(fn):
     @wraps(fn)
-    def wrapper(*a, **kw):
+    def wrapper(*args, **kwargs):
         if session.get("role") != "admin":
-            abort(403)
-        return fn(*a, **kw)
+            return jsonify({"error": "Admin only"}), 403
+        return fn(*args, **kwargs)
     return wrapper
 
 # ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
-        u = request.form["username"]
-        p = request.form["password"]
+        u = request.form.get("username")
+        p = request.form.get("password")
 
         conn = get_db()
         cur = conn.cursor()
@@ -129,7 +114,7 @@ def login():
             session["role"] = user["role"]
             return redirect(url_for("dashboard"))
 
-        return render_template("login.html", error="Invalid credentials")
+        return render_template("login.html", error="Invalid username or password")
 
     return render_template("login.html")
 
@@ -148,14 +133,54 @@ def row_to_obj(r):
         "model": r["model"],
         "problem": r["problem"],
         "receive_date": r["receive_date"],
+        "out_date": r["out_date"],
+        "in_date": r["in_date"],
+        "ready_date": r["ready_date"],
+        "return_date": r["return_date"],
+        "reject_date": r["reject_date"],
         "status": r["status"],
-        "bill": json.loads(r["bill_json"] or "{}")
+        "bill": json.loads(r["bill_json"]) if r["bill_json"] else {}
     }
 
-def whatsapp_pdf_link(entry):
-    pdf = f"https://it-solutions-flask.onrender.com/print/{entry['id']}"
-    msg = f"Your bill is ready:\n{pdf}"
-    return f"https://wa.me/91{entry['phone']}?text={urllib.parse.quote(msg)}"
+def whatsapp_bill_link(entry, total):
+    msg = f"""
+🧾 IT SOLUTIONS
+
+Customer: {entry['customer']}
+Model: {entry['model']}
+
+💰 Total Bill: ₹{total}
+
+🙏 Thank you!
+"""
+    text = urllib.parse.quote(msg)
+    phone = entry["phone"].replace("+","").replace(" ","")
+    return f"https://wa.me/91{phone}?text={text}"
+
+# ---------------- EXPORT ----------------
+@app.get("/export/entries")
+@login_required
+def export_entries():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM entries ORDER BY id DESC")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    si = StringIO()
+    cw = csv.writer(si)
+
+    if rows:
+        cw.writerow(rows[0].keys())
+        for r in rows:
+            cw.writerow(r.values())
+
+    return Response(
+        si.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=entries.csv"}
+    )
 
 # ---------------- DASHBOARD ----------------
 @app.route("/")
@@ -171,16 +196,13 @@ def dashboard():
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
 
-    ten = (datetime.datetime.now()-datetime.timedelta(days=10)).strftime("%Y-%m-%d")
-    cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered' AND receive_date<%s",(ten,))
-    overdue = cur.fetchone()["n"]
-
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
 
     return render_template("dashboard.html", kp={
         "today_sales": today_sales,
         "pending": pending,
-        "overdue": overdue,
+        "overdue": 0,
         "ledger_bal": 0
     })
 
@@ -197,68 +219,160 @@ def list_entries():
     cur = conn.cursor()
     cur.execute("SELECT * FROM entries ORDER BY id DESC")
     rows = cur.fetchall()
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
 
-    out=[]
+    data = []
     for r in rows:
-        o=row_to_obj(r)
-        if o["status"]=="Delivered":
-            o["whatsapp"]=whatsapp_pdf_link(o)
-        out.append(o)
-    return jsonify(out)
+        obj = row_to_obj(r)
+
+        bill = obj["bill"]
+        total = bill.get("parts_total",0) + bill.get("service_charge",0) + bill.get("other",0)
+
+        obj["whatsapp"] = whatsapp_bill_link(obj, total) if obj["status"]=="Delivered" and obj["phone"] else ""
+        data.append(obj)
+
+    return jsonify(data)
 
 @app.post("/api/entries")
 @login_required
 def add_entry():
-    d=request.get_json()
-    conn=get_db(); cur=conn.cursor()
+    d = request.get_json(force=True)
+    conn = get_db()
+    cur = conn.cursor()
+
     cur.execute("""
         INSERT INTO entries(type,customer,phone,model,problem,receive_date,status)
-        VALUES(%s,%s,%s,%s,%s,%s,%s)
-    """,(d["type"],d["customer"],d["phone"],d["model"],d["problem"],now(),"Received"))
-    conn.commit()
-    cur.close(); conn.close()
-    return jsonify(ok=True)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """, (
+        d.get("type",""),
+        d.get("customer",""),
+        d.get("phone",""),
+        d.get("model",""),
+        d.get("problem",""),
+        now(),
+        "Received"
+    ))
 
-# ---------------- ACTIONS ----------------
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
+
+# ---------------- OVERDUE ----------------
+@app.route("/overdue")
+@login_required
+def overdue_page():
+    return render_template("overdue.html")
+
+@app.get("/api/overdue")
+@login_required
+def overdue_list():
+    conn = get_db()
+    cur = conn.cursor()
+
+    ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+
+    cur.execute("""
+        SELECT * FROM entries
+        WHERE status!='Delivered'
+        AND receive_date < %s
+        ORDER BY receive_date ASC
+    """, (ten_days_ago,))
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([row_to_obj(r) for r in rows])
+
+# ---------------- ENTRY ACTIONS ----------------
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
-    a=request.get_json()["action"]
-    conn=get_db(); cur=conn.cursor()
-    cur.execute("UPDATE entries SET status=%s WHERE id=%s",(a,eid))
+    d = request.get_json(force=True)
+    a = d.get("action")
+    t = now()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    if a == "out":
+        cur.execute("UPDATE entries SET status='Out', out_date=%s WHERE id=%s", (t,eid))
+    elif a == "in":
+        cur.execute("UPDATE entries SET status='In', in_date=%s WHERE id=%s", (t,eid))
+    elif a == "ready":
+        cur.execute("UPDATE entries SET status='Ready', ready_date=%s WHERE id=%s", (t,eid))
+    elif a == "delivered":
+        cur.execute("UPDATE entries SET status='Delivered', return_date=%s WHERE id=%s", (t,eid))
+    elif a == "reject":
+        cur.execute("UPDATE entries SET status='Rejected', reject_date=%s WHERE id=%s", (t,eid))
+    else:
+        return jsonify({"error":"Invalid action"}),400
+
     conn.commit()
-    cur.close(); conn.close()
-    return jsonify(ok=True)
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
 
 # ---------------- BILL ----------------
 @app.post("/api/entries/<int:eid>/bill")
 @login_required
 def save_bill(eid):
-    d=request.get_json()
-    total=float(d["parts_total"])+float(d["service_charge"])+float(d["other"])
-    conn=get_db(); cur=conn.cursor()
-    cur.execute("UPDATE entries SET bill_json=%s WHERE id=%s",(json.dumps(d),eid))
-    cur.execute(
-        "INSERT INTO sales VALUES(DEFAULT,%s,'Service',1,%s,%s,%s,'')",
-        (now(),total,total,d["payment_mode"])
-    )
+    d = request.get_json(force=True)
+
+    bill = {
+        "parts": d.get("parts",""),
+        "parts_total": float(d.get("parts_total") or 0),
+        "service_charge": float(d.get("service_charge") or 0),
+        "other": float(d.get("other") or 0),
+        "payment_mode": d.get("payment_mode","Cash")
+    }
+
+    total = bill["parts_total"] + bill["service_charge"] + bill["other"]
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE entries SET bill_json=%s WHERE id=%s", (json.dumps(bill), eid))
+    cur.execute("""
+        INSERT INTO sales(sale_date,item,qty,rate,amount,payment_mode,note)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """, (now(),"Service Bill",1,total,total,bill["payment_mode"],f"Entry {eid}"))
+
     conn.commit()
-    cur.close(); conn.close()
-    return jsonify(ok=True)
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
+
+# ---------------- DELETE ----------------
+@app.delete("/api/entries/<int:eid>")
+@login_required
+@admin_required
+def delete_entry(eid):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM entries WHERE id=%s", (eid,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"deleted": True})
 
 # ---------------- PRINT ----------------
 @app.get("/print/<int:eid>")
+@login_required
 def print_receipt(eid):
-    conn=get_db(); cur=conn.cursor()
-    cur.execute("SELECT * FROM entries WHERE id=%s",(eid,))
-    r=cur.fetchone()
-    cur.close(); conn.close()
-    if not r: abort(404)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
+    r = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not r:
+        abort(404)
+
     return render_template("receipt.html", e=row_to_obj(r),
         shop={"name":"IT SOLUTIONS","addr":"GHATSILA COLLEGE ROAD"}
     )
 
 # ---------------- RUN ----------------
-if __name__=="__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
