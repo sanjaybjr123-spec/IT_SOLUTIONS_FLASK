@@ -368,6 +368,29 @@ def ink_sell():
     """,(d["qty"],now(),d["id"],d["qty"]))
     conn.commit();cur.close();conn.close()
     return jsonify({"ok":True})
+@app.post("/api/ink/model")
+@login_required
+def add_ink_model():
+    d = request.get_json(force=True)
+    model = d.get("model","").strip()
+
+    if not model:
+        return jsonify({"error":"Model required"}),400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO ink_master(model)
+        VALUES(%s)
+        ON CONFLICT (model) DO NOTHING
+    """, (model,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"ok": True})
 # ---------------- DELETE ----------------
 @app.delete("/api/entries/<int:eid>")
 @login_required
