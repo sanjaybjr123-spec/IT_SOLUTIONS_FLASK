@@ -75,6 +75,41 @@ def init_db():
         conn.close()
     except Exception as e:
         print("DB init skipped:", e)
+CREATE TABLE IF NOT EXISTS ink_master(
+  id SERIAL PRIMARY KEY,
+  ink_name TEXT UNIQUE,
+  created_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ink_stock(
+  ink_id INTEGER PRIMARY KEY,
+  qty INTEGER,
+  updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ink_transactions(
+  id SERIAL PRIMARY KEY,
+  ink_id INTEGER,
+  qty INTEGER,
+  type TEXT,
+  date_time TEXT
+);
+# ---------- DEFAULT INK MASTER ----------
+cur.execute("SELECT COUNT(*) c FROM ink_master")
+if cur.fetchone()["c"] == 0:
+    inks = [
+        "HP 680 Black",
+        "HP 680 Color",
+        "Canon 790 Black",
+        "Canon 790 Color",
+        "Epson 003 Black",
+        "Epson 003 Color"
+    ]
+    for i in inks:
+        cur.execute(
+            "INSERT INTO ink_master(ink_name,created_at) VALUES(%s,%s)",
+            (i, now())
+        )
 
 init_db()
 
@@ -487,6 +522,64 @@ def bill_pdf(eid):
         mimetype="application/pdf",
         headers={"Content-Disposition": f"inline; filename=bill_{eid}.pdf"}
     )
+# ---------------- INK STOCK ----------------
+
+@app.get("/api/ink")
+@login_required
+def ink_list():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ink_stock(
+            id SERIAL PRIMARY KEY,
+            model TEXT UNIQUE,
+            qty INTEGER,
+            updated_at TEXT
+        )
+    """)
+    cur.execute("SELECT * FROM ink_stock ORDER BY model")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify(rows)
+
+
+@app.post("/api/ink/in")
+@login_required
+def ink_in():
+    d = request.get_json(force=True)
+    model = d.get("model")
+    qty = int(d.get("qty", 0))
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO ink_stock(model, qty, updated_at)
+        VALUES(%s,%s,%s)
+        ON CONFLICT (model)
+        DO UPDATE SET qty=ink_stock.qty+%s, updated_at=%s
+    """, (model, qty, now(), qty, now()))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/ink/sell")
+@login_required
+def ink_sell():
+    d = request.get_json(force=True)
+    model = d.get("model")
+    qty = int(d.get("qty", 0))
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE ink_stock SET qty=qty-%s, updated_at=%s WHERE model=%s",
+                (qty, now(), model))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
 
 # ---------------- RUN ---------------
 if __name__ == "__main__":
