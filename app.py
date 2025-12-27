@@ -75,8 +75,111 @@ def init_db():
         conn.close()
     except Exception as e:
         print("DB init skipped:", e)
+# ---------- INK MASTER ----------
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ink_master(
+            id SERIAL PRIMARY KEY,
+            model TEXT UNIQUE
+        )
+        """)
+
+        # ---------- INK STOCK ----------
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ink_stock(
+            ink_id INTEGER PRIMARY KEY,
+            qty INTEGER DEFAULT 0,
+            updated_at TEXT
+        )
+        """)
+
+        # ---------- DEFAULT INK DATA ----------
+        cur.execute("SELECT COUNT(*) c FROM ink_master")
+        if cur.fetchone()["c"] == 0:
+            inks = [
+                "HP 680 Black",
+                "HP 680 Color",
+                "Canon 790 Black",
+                "Canon 790 Color",
+                "Epson 003 Black",
+                "Epson 003 Color"
+            ]
+            for i in inks:
+                cur.execute(
+                    "INSERT INTO ink_master(model) VALUES (%s)",
+                    (i,)
+                )
 
 init_db()
+# ---------------- INK STOCK PAGES ----------------
+
+@app.route("/ink")
+@login_required
+def ink_page():
+    return render_template("ink.html")
+
+
+@app.get("/api/ink")
+@login_required
+def ink_list():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT m.id, m.model, COALESCE(s.qty,0) qty
+        FROM ink_master m
+        LEFT JOIN ink_stock s ON m.id = s.ink_id
+        ORDER BY m.model
+    """)
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+    return jsonify(rows)
+
+
+@app.post("/api/ink/in")
+@login_required
+def ink_in():
+    d = request.get_json(force=True)
+    ink_id = int(d.get("id"))
+    qty = int(d.get("qty"))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO ink_stock(ink_id, qty, updated_at)
+        VALUES(%s,%s,%s)
+        ON CONFLICT (ink_id)
+        DO UPDATE SET qty=ink_stock.qty+%s, updated_at=%s
+    """, (ink_id, qty, now(), qty, now()))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/ink/sell")
+@login_required
+def ink_sell():
+    d = request.get_json(force=True)
+    ink_id = int(d.get("id"))
+    qty = int(d.get("qty"))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE ink_stock
+        SET qty = qty - %s, updated_at = %s
+        WHERE ink_id = %s AND qty >= %s
+    """, (qty, now(), ink_id, qty))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
 
 # ---------------- AUTH ----------------
 def login_required(fn):
