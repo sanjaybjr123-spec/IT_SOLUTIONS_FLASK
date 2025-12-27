@@ -245,7 +245,6 @@ def dashboard():
 
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
-
 ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
     cur.execute("""
         SELECT COUNT(*) n FROM entries
