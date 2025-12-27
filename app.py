@@ -368,6 +368,35 @@ def ink_sell():
     """,(d["qty"],now(),d["id"],d["qty"]))
     conn.commit();cur.close();conn.close()
     return jsonify({"ok":True})
+# ---------------- DELETE ----------------
+@app.delete("/api/entries/<int:eid>")
+@login_required
+@admin_required
+def delete_entry(eid):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM entries WHERE id=%s", (eid,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"deleted": True})
+
+# ---------------- PRINT ----------------
+@app.get("/print/<int:eid>")
+def print_receipt(eid):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM entries WHERE id=%s", (eid,))
+    r = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not r:
+        abort(404)
+
+    return render_template("receipt.html", e=row_to_obj(r),
+        shop={"name":"IT SOLUTIONS","addr":"GHATSILA COLLEGE ROAD"}
+    )
+
 
 # ================= RUN =================
 if __name__ == "__main__":
