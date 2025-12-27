@@ -240,12 +240,20 @@ def dashboard():
     cur = conn.cursor()
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    cur.execute("SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s", (today+"%",))
+
+    # Today sales
+    cur.execute(
+        "SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s",
+        (today+"%",)
+    )
     today_sales = cur.fetchone()["s"]
 
+    # Pending
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
-ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+
+    # Overdue (>10 days)
+    ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
     cur.execute("""
         SELECT COUNT(*) n FROM entries
         WHERE status!='Delivered'
@@ -259,9 +267,10 @@ ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime(
     return render_template("dashboard.html", kp={
         "today_sales": today_sales,
         "pending": pending,
-        "overdue": overdue,
+        "overdue": overdue,   # ✅ ab sahi count
         "ledger_bal": 0
     })
+        
 
 # ---------------- SERVICE ----------------
 @app.route("/service")
