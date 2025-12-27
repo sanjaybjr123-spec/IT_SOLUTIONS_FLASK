@@ -418,6 +418,24 @@ def add_ink_model():
     conn.close()
 
     return jsonify({"ok": True})
+
+# ---------- DELETE INK MODEL ----------
+@app.delete("/api/ink/<int:ink_id>")
+@login_required
+def delete_ink(ink_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    # पहले stock delete
+    cur.execute("DELETE FROM ink_stock WHERE ink_id=%s", (ink_id,))
+    # फिर master delete
+    cur.execute("DELETE FROM ink_master WHERE id=%s", (ink_id,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"ok": True})
     
 # ---------------- DELETE ----------------
 @app.delete("/api/entries/<int:eid>")
