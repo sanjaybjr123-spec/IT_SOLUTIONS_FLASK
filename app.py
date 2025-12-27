@@ -246,13 +246,21 @@ def dashboard():
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
 
+ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+    cur.execute("""
+        SELECT COUNT(*) n FROM entries
+        WHERE status!='Delivered'
+        AND receive_date < %s
+    """, (ten_days_ago,))
+    overdue = cur.fetchone()["n"]
+
     cur.close()
     conn.close()
 
     return render_template("dashboard.html", kp={
         "today_sales": today_sales,
         "pending": pending,
-        "overdue": 0,
+        "overdue": overdue,
         "ledger_bal": 0
     })
 
