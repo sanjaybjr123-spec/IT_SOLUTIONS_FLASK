@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h4>🖨️ Ink Stock Management</h4>
+
+<div class="row g-3">
+
+<!-- ADD STOCK -->
+<div class="col-md-6">
+<div class="card p-3">
+<h6>Add Ink Stock</h6>
+
+<select id="ink_in" class="form-select mb-2"></select>
+<input id="qty_in" type="number" class="form-control mb-2" placeholder="Quantity">
+
+<button class="btn btn-success w-100" onclick="addStock()">➕ ADD STOCK</button>
+</div>
+</div>
+
+<!-- SELL -->
+<div class="col-md-6">
+<div class="card p-3">
+<h6>Sell Ink</h6>
+
+<select id="ink_sell" class="form-select mb-2" onchange="showQty()"></select>
+<div id="avail" class="mb-2 text-muted"></div>
+
+<input id="qty_sell" type="number" class="form-control mb-2" placeholder="Sell Quantity">
+
+<button class="btn btn-danger w-100" onclick="sellStock()">💸 SELL INK</button>
+</div>
+</div>
+
+</div>
+
+<hr>
+
+<h6>Live Stock</h6>
+<table class="table table-sm">
+<thead>
+<tr><th>Ink</th><th>Qty</th><th>Status</th></tr>
+</thead>
+<tbody id="stockTbl"></tbody>
+</table>
+
+<script>
+async function api(u,o={}){return (await fetch(u,o)).json()}
+
+async function load(){
+  const d=await api('/api/ink');
+  let i1='',i2='',t='';
+  d.forEach(r=>{
+    i1+=`<option value="${r.id}">${r.name}</option>`;
+    if(r.qty>0) i2+=`<option value="${r.id}">${r.name}</option>`;
+    let c=r.qty<5?'🔴':r.qty<=10?'🟡':'🟢';
+    t+=`<tr><td>${r.name}</td><td>${r.qty}</td><td>${c}</td></tr>`;
+  });
+  ink_in.innerHTML=i1;
+  ink_sell.innerHTML=i2;
+  stockTbl.innerHTML=t;
+}
+async function showQty(){
+  const d=await api('/api/ink');
+  const x=d.find(i=>i.id==ink_sell.value);
+  avail.innerHTML="Available: "+x.qty;
+}
+async function addStock(){
+  await api('/api/ink/in',{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({id:ink_in.value,qty:qty_in.value})});
+  load();
+}
+async function sellStock(){
+  await api('/api/ink/sell',{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({id:ink_sell.value,qty:qty_sell.value})});
+  load();
+}
+load();
+</script>
+{% endblock %}
