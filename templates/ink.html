@@ -1,94 +1,152 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h4 class="mb-3">🖨️ Ink Stock Management</h4>
+<h4 class="mb-4">🖨️ Ink Stock Management</h4>
 
 <div class="row g-3">
 
-<div class="col-md-6">
-<div class="card p-3">
-<h6>Add Ink Stock</h6>
+  <!-- ADD STOCK -->
+  <div class="col-md-6">
+    <div class="card p-3 shadow-sm">
+      <h6>Add Ink Stock</h6>
 
-<select id="ink_in" class="form-select mb-2"></select>
-<input id="qty_in" type="number" class="form-control mb-2" placeholder="Quantity">
+      <select id="ink_in" class="form-select mb-2"></select>
 
-<button class="btn btn-success w-100" onclick="addStock()">➕ ADD STOCK</button>
-</div>
-</div>
+      <input id="qty_in" type="number" class="form-control mb-2"
+             placeholder="Quantity" required>
 
-<div class="col-md-6">
-<div class="card p-3">
-<h6>Sell Ink</h6>
+      <input id="date_in" type="date" class="form-control mb-2" required>
 
-<select id="ink_sell" class="form-select mb-2" onchange="showQty()"></select>
-<div id="avail" class="text-muted mb-2"></div>
+      <button class="btn btn-success w-100" onclick="addStock()">
+        ➕ ADD STOCK
+      </button>
+    </div>
+  </div>
 
-<input id="qty_sell" type="number" class="form-control mb-2" placeholder="Sell Quantity">
+  <!-- SELL STOCK -->
+  <div class="col-md-6">
+    <div class="card p-3 shadow-sm">
+      <h6>Sell Ink</h6>
 
-<button class="btn btn-danger w-100" onclick="sellStock()">💸 SELL INK</button>
-</div>
-</div>
+      <select id="ink_sell" class="form-select mb-2" onchange="showQty()"></select>
+
+      <div id="avail" class="text-muted mb-2"></div>
+
+      <input id="qty_sell" type="number" class="form-control mb-2"
+             placeholder="Sell Quantity" required>
+
+      <input id="date_sell" type="date" class="form-control mb-2" required>
+
+      <button class="btn btn-danger w-100" onclick="sellStock()">
+        💸 SELL INK
+      </button>
+    </div>
+  </div>
 
 </div>
 
 <hr>
 
 <h6>Live Stock</h6>
-<table class="table table-sm">
-<thead>
-<tr>
-<th>Ink</th>
-<th>Qty</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody id="stockTbl"></tbody>
+<table class="table table-bordered table-sm">
+  <thead class="table-light">
+    <tr>
+      <th>Ink</th>
+      <th>Qty</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody id="stockTbl"></tbody>
 </table>
 
 <script>
-async function api(u,o={}){ return (await fetch(u,o)).json(); }
-
-async function load(){
-  const d = await api('/api/ink');
-  let a='',b='',t='';
-  d.forEach(r=>{
-    a += `<option value="${r.id}">${r.model}</option>`;
-    if(r.qty>0) b += `<option value="${r.id}">${r.model}</option>`;
-    let s = r.qty<5?'🔴 Low':r.qty<=10?'🟡 Medium':'🟢 OK';
-    t += `<tr><td>${r.model}</td><td>${r.qty}</td><td>${s}</td></tr>`;
-  });
-  ink_in.innerHTML=a;
-  ink_sell.innerHTML=b;
-  stockTbl.innerHTML=t;
+async function api(url, options = {}) {
+  const r = await fetch(url, options);
+  return r.json();
 }
 
+/* LOAD STOCK */
+async function load() {
+  const data = await api('/api/ink');
+
+  let optIn = '', optSell = '', rows = '';
+  data.forEach(i => {
+    optIn += `<option value="${i.id}">${i.model}</option>`;
+    if (i.qty > 0) optSell += `<option value="${i.id}">${i.model}</option>`;
+
+    let status =
+      i.qty < 5  ? '🔴 Low' :
+      i.qty <=10 ? '🟡 Medium' : '🟢 OK';
+
+    rows += `
+      <tr>
+        <td>${i.model}</td>
+        <td>${i.qty}</td>
+        <td>${status}</td>
+      </tr>`;
+  });
+
+  ink_in.innerHTML = optIn;
+  ink_sell.innerHTML = optSell;
+  stockTbl.innerHTML = rows;
+}
+
+/* SHOW AVAILABLE QTY */
 async function showQty(){
-  const d = await api('/api/ink');
-  const x = d.find(i=>i.id==ink_sell.value);
-  avail.innerHTML = x ? "Available: "+x.qty : "";
+  const data = await api('/api/ink');
+  const x = data.find(i => i.id == ink_sell.value);
+  avail.innerText = x ? `Available: ${x.qty}` : '';
 }
 
+/* ADD STOCK */
 async function addStock(){
-  await api('/api/ink/in',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:ink_in.value,qty:qty_in.value})
+  if(!qty_in.value || !date_in.value){
+    alert("Quantity aur Date dono mandatory hai");
+    return;
+  }
+
+  await api('/api/ink/in', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id: ink_in.value,
+      qty: qty_in.value,
+      date: date_in.value
+    })
   });
-  qty_in.value='';
+
+  qty_in.value = '';
   load();
 }
 
+/* SELL STOCK */
 async function sellStock(){
-  await api('/api/ink/sell',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:ink_sell.value,qty:qty_sell.value})
+  if(!qty_sell.value || !date_sell.value){
+    alert("Quantity aur Date dono mandatory hai");
+    return;
+  }
+
+  await api('/api/ink/sell', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id: ink_sell.value,
+      qty: qty_sell.value,
+      date: date_sell.value
+    })
   });
-  qty_sell.value='';
+
+  qty_sell.value = '';
   load();
 }
 
-load();
+/* AUTO SET TODAY DATE */
+window.onload = () => {
+  const today = new Date().toISOString().split('T')[0];
+  date_in.value = today;
+  date_sell.value = today;
+  load();
+};
 </script>
 
 {% endblock %}
