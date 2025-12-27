@@ -190,11 +190,26 @@ def dashboard():
     cur = conn.cursor()
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    cur.execute("SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s", (today+"%",))
+
+    # Today sales
+    cur.execute(
+        "SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s",
+        (today+"%",)
+    )
     today_sales = cur.fetchone()["s"]
 
+    # Pending
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
+
+    # Overdue (>10 days)
+    ten_days_ago = (datetime.datetime.now() - datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+    cur.execute("""
+        SELECT COUNT(*) n FROM entries
+        WHERE status!='Delivered'
+        AND receive_date < %s
+    """, (ten_days_ago,))
+    overdue = cur.fetchone()["n"]
 
     cur.close()
     conn.close()
@@ -202,7 +217,7 @@ def dashboard():
     return render_template("dashboard.html", kp={
         "today_sales": today_sales,
         "pending": pending,
-        "overdue": 0,
+        "overdue": overdue,   # ✅ ab sahi count
         "ledger_bal": 0
     })
 
@@ -358,7 +373,6 @@ def delete_entry(eid):
 
 # ---------------- PRINT ----------------
 @app.get("/print/<int:eid>")
-@login_required
 def print_receipt(eid):
     conn = get_db()
     cur = conn.cursor()
