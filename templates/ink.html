@@ -82,21 +82,24 @@ async function api(url, options={}){
   return await r.json();
 }
 
+let inkCache = [];
+
 async function load(){
-  const data = await api("/api/ink");
+  inkCache = await api("/api/ink");
 
   let optIn = '<option value="">Select Ink</option>';
   let optSell = '<option value="">Select Ink</option>';
   let rows = "";
 
-  data.forEach(r=>{
+  inkCache.forEach(r=>{
     optIn += `<option value="${r.id}">${r.model}</option>`;
     if(r.qty > 0){
       optSell += `<option value="${r.id}">${r.model}</option>`;
     }
 
-    let status = r.qty < 5 ? "🔴 Low" :
-                 r.qty <= 10 ? "🟡 Medium" : "🟢 OK";
+    let status =
+      r.qty < 5 ? "🔴 Low" :
+      r.qty <= 10 ? "🟡 Medium" : "🟢 OK";
 
     rows += `
       <tr>
@@ -111,9 +114,8 @@ async function load(){
   stockTbl.innerHTML = rows;
 }
 
-async function showQty(){
-  const data = await api("/api/ink");
-  const x = data.find(i=>i.id == ink_sell.value);
+function showQty(){
+  const x = inkCache.find(i=>i.id == ink_sell.value);
   avail.innerHTML = x ? "Available: " + x.qty : "";
 }
 
@@ -146,7 +148,7 @@ async function addStock(){
     body: JSON.stringify({
       id: ink_in.value,
       qty: qty_in.value,
-      date: date_in.value
+      date: date_in.value   // future use ke liye
     })
   });
 
@@ -155,8 +157,15 @@ async function addStock(){
 }
 
 async function sellStock(){
+  const ink = inkCache.find(i=>i.id == ink_sell.value);
+
   if(!ink_sell.value || !qty_sell.value || !date_sell.value){
     alert("Ink, Quantity aur Date mandatory hai");
+    return;
+  }
+
+  if(Number(qty_sell.value) > ink.qty){
+    alert("Available stock se zyada sell nahi ho sakta");
     return;
   }
 
