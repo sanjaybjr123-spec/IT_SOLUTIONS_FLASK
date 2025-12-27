@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h4>🖨️ Ink Stock Management</h4>
+<h4 class="mb-3">🖨️ Ink Stock Management</h4>
 
 <div class="row g-3">
 
 <div class="col-md-6">
 <div class="card p-3">
-<h6>Add Stock</h6>
+<h6>Add Ink Stock</h6>
 
 <select id="ink_in" class="form-select mb-2"></select>
 <input id="qty_in" type="number" class="form-control mb-2" placeholder="Quantity">
-<button class="btn btn-success w-100" onclick="addStock()">ADD</button>
+
+<button class="btn btn-success w-100" onclick="addStock()">➕ ADD STOCK</button>
 </div>
 </div>
 
@@ -19,9 +20,12 @@
 <div class="card p-3">
 <h6>Sell Ink</h6>
 
-<select id="ink_sell" class="form-select mb-2"></select>
-<input id="qty_sell" type="number" class="form-control mb-2" placeholder="Quantity">
-<button class="btn btn-danger w-100" onclick="sellStock()">SELL</button>
+<select id="ink_sell" class="form-select mb-2" onchange="showQty()"></select>
+<div id="avail" class="text-muted mb-2"></div>
+
+<input id="qty_sell" type="number" class="form-control mb-2" placeholder="Sell Quantity">
+
+<button class="btn btn-danger w-100" onclick="sellStock()">💸 SELL INK</button>
 </div>
 </div>
 
@@ -29,39 +33,62 @@
 
 <hr>
 
-<table class="table table-bordered mt-3">
+<h6>Live Stock</h6>
+<table class="table table-sm">
 <thead>
-<tr><th>Ink</th><th>Qty</th><th>Status</th></tr>
+<tr>
+<th>Ink</th>
+<th>Qty</th>
+<th>Status</th>
+</tr>
 </thead>
-<tbody id="tbl"></tbody>
+<tbody id="stockTbl"></tbody>
 </table>
 
 <script>
-async function api(u,o={}){return (await fetch(u,o)).json()}
+async function api(u,o={}){ return (await fetch(u,o)).json(); }
 
 async function load(){
- const d=await api('/api/ink')
- let i='',t=''
- d.forEach(x=>{
-   i+=`<option value="${x.id}">${x.model}</option>`
-   let c=x.qty<5?'🔴':x.qty<=10?'🟡':'🟢'
-   t+=`<tr><td>${x.model}</td><td>${x.qty}</td><td>${c}</td></tr>`
- })
- ink_in.innerHTML=i
- ink_sell.innerHTML=i
- tbl.innerHTML=t
+  const d = await api('/api/ink');
+  let a='',b='',t='';
+  d.forEach(r=>{
+    a += `<option value="${r.id}">${r.model}</option>`;
+    if(r.qty>0) b += `<option value="${r.id}">${r.model}</option>`;
+    let s = r.qty<5?'🔴 Low':r.qty<=10?'🟡 Medium':'🟢 OK';
+    t += `<tr><td>${r.model}</td><td>${r.qty}</td><td>${s}</td></tr>`;
+  });
+  ink_in.innerHTML=a;
+  ink_sell.innerHTML=b;
+  stockTbl.innerHTML=t;
 }
+
+async function showQty(){
+  const d = await api('/api/ink');
+  const x = d.find(i=>i.id==ink_sell.value);
+  avail.innerHTML = x ? "Available: "+x.qty : "";
+}
+
 async function addStock(){
- await api('/api/ink/in',{method:'POST',headers:{'Content-Type':'application/json'},
- body:JSON.stringify({id:ink_in.value,qty:qty_in.value})})
- load()
+  await api('/api/ink/in',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:ink_in.value,qty:qty_in.value})
+  });
+  qty_in.value='';
+  load();
 }
+
 async function sellStock(){
- await api('/api/ink/sell',{method:'POST',headers:{'Content-Type':'application/json'},
- body:JSON.stringify({id:ink_sell.value,qty:qty_sell.value})})
- load()
+  await api('/api/ink/sell',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:ink_sell.value,qty:qty_sell.value})
+  });
+  qty_sell.value='';
+  load();
 }
-load()
+
+load();
 </script>
 
 {% endblock %}
