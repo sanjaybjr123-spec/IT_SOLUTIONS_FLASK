@@ -337,14 +337,13 @@ def ink_list():
     conn = get_db()
     cur = conn.cursor()
 
-    # ✅ Ensure tables exist (safe for free DB)
+    # tables ensure (safe)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_master(
             id SERIAL PRIMARY KEY,
-            model TEXT UNIQUE
+            ink_name TEXT UNIQUE
         )
     """)
-
     cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_stock(
             ink_id INTEGER PRIMARY KEY,
@@ -353,18 +352,21 @@ def ink_list():
         )
     """)
 
-    # ✅ Now fetch data safely
+    # 🔧 FIXED COLUMN NAME
     cur.execute("""
-        SELECT m.id, m.model, COALESCE(s.qty,0) qty
+        SELECT m.id,
+               m.ink_name AS model,
+               COALESCE(s.qty,0) AS qty
         FROM ink_master m
         LEFT JOIN ink_stock s ON m.id = s.ink_id
-        ORDER BY m.model
+        ORDER BY m.ink_name
     """)
 
     rows = cur.fetchall()
     cur.close()
     conn.close()
     return jsonify(rows)
+        
 
 @app.post("/api/ink/in")
 @login_required
@@ -397,24 +399,26 @@ def ink_sell():
 @login_required
 def add_ink_model():
     d = request.get_json(force=True)
-    model = d.get("model","").strip()
+    name = d.get("model","").strip()
 
-    if not model:
-        return jsonify({"error":"Model required"}),400
+    if not name:
+        return jsonify({"error":"Ink name required"}),400
 
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute(
-        "INSERT INTO ink_master(model) VALUES(%s) ON CONFLICT DO NOTHING",
-        (model,)
-    )
+    cur.execute("""
+        INSERT INTO ink_master(ink_name)
+        VALUES(%s)
+        ON CONFLICT DO NOTHING
+    """, (name,))
 
     conn.commit()
     cur.close()
     conn.close()
 
     return jsonify({"ok": True})
+    
 # ---------------- DELETE ----------------
 @app.delete("/api/entries/<int:eid>")
 @login_required
