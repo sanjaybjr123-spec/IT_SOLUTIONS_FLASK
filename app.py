@@ -414,46 +414,65 @@ def ink_list():
     conn.close()
     return jsonify(rows)
         
-
 @app.post("/api/ink/in")
 @login_required
 def ink_in():
-    d=request.get_json(force=True)
-    conn=get_db();cur=conn.cursor()
+    d = request.get_json(force=True)
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # update stock
     cur.execute("""
         INSERT INTO ink_stock(ink_id,qty,updated_at)
         VALUES(%s,%s,%s)
         ON CONFLICT (ink_id)
-        DO UPDATE SET qty=ink_stock.qty+%s,updated_at=%s
-    """,(d["id"],d["qty"],now(),d["qty"],now()))
-# save IN history
-cur.execute("""
-    INSERT INTO ink_transactions
-    (ink_id, ink_name, qty, action, action_date)
-    SELECT id, ink_name, %s, 'IN', %s
-    FROM ink_master WHERE id=%s
-""", (d["qty"], now(), d["id"]))
-    conn.commit();cur.close();conn.close()
-    return jsonify({"ok":True})
+        DO UPDATE SET qty=ink_stock.qty+%s, updated_at=%s
+    """, (d["id"], d["qty"], now(), d["qty"], now()))
+
+    # save IN history
+    cur.execute("""
+        INSERT INTO ink_transactions
+        (ink_id, ink_name, qty, action, action_date)
+        SELECT id, ink_name, %s, 'IN', %s
+        FROM ink_master WHERE id=%s
+    """, (d["qty"], now(), d["id"]))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"ok": True})
+
 
 @app.post("/api/ink/sell")
 @login_required
 def ink_sell():
-    d=request.get_json(force=True)
-    conn=get_db();cur=conn.cursor()
+    d = request.get_json(force=True)
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # reduce stock
     cur.execute("""
-        UPDATE ink_stock SET qty=qty-%s,updated_at=%s
-        WHERE ink_id=%s AND qty>=%s
-    """,(d["qty"],now(),d["id"],d["qty"]))
-# save SELL history
-cur.execute("""
-    INSERT INTO ink_transactions
-    (ink_id, ink_name, qty, action, action_date)
-    SELECT id, ink_name, %s, 'SELL', %s
-    FROM ink_master WHERE id=%s
-""", (d["qty"], now(), d["id"]))
-    conn.commit();cur.close();conn.close()
-    return jsonify({"ok":True})
+        UPDATE ink_stock
+        SET qty = qty - %s, updated_at = %s
+        WHERE ink_id = %s AND qty >= %s
+    """, (d["qty"], now(), d["id"], d["qty"]))
+
+    # save SELL history
+    cur.execute("""
+        INSERT INTO ink_transactions
+        (ink_id, ink_name, qty, action, action_date)
+        SELECT id, ink_name, %s, 'SELL', %s
+        FROM ink_master WHERE id=%s
+    """, (d["qty"], now(), d["id"]))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"ok": True})
 
 # ---------- ADD NEW INK MODEL ----------
 @app.post("/api/ink/model")
