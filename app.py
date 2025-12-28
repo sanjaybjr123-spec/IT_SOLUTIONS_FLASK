@@ -123,6 +123,17 @@ def init_db():
 
     except Exception as e:
         print("DB init skipped:", e)
+# ---- INK TRANSACTIONS (HISTORY) ----
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ink_transactions(
+            id SERIAL PRIMARY KEY,
+            ink_id INTEGER,
+            ink_name TEXT,
+            qty INTEGER,
+            action TEXT,          -- IN / SELL
+            action_date TEXT
+        )
+        """)
 
 init_db()
 
@@ -324,7 +335,43 @@ def export_entries():
         for r in rows:cw.writerow(r.values())
     return Response(si.getvalue(),mimetype="text/csv",
         headers={"Content-Disposition":"attachment;filename=entries.csv"})
+# ---------- EXPORT INK HISTORY ----------
+@app.get("/export/ink")
+@login_required
+def export_ink_history():
+    conn = get_db()
+    cur = conn.cursor()
 
+    cur.execute("""
+        SELECT action_date, ink_name, qty, action
+        FROM ink_transactions
+        ORDER BY action_date ASC
+    """)
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    si = StringIO()
+    cw = csv.writer(si)
+
+    cw.writerow(["Date", "Ink Name", "Quantity", "Type"])
+
+    for r in rows:
+        cw.writerow([
+            r["action_date"],
+            r["ink_name"],
+            r["qty"],
+            r["action"]
+        ])
+
+    return Response(
+        si.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": "attachment;filename=ink_history.csv"
+        }
+    )
 # ================= INK STOCK =================
 @app.route("/ink")
 @login_required
@@ -379,6 +426,13 @@ def ink_in():
         ON CONFLICT (ink_id)
         DO UPDATE SET qty=ink_stock.qty+%s,updated_at=%s
     """,(d["id"],d["qty"],now(),d["qty"],now()))
+# save IN history
+cur.execute("""
+    INSERT INTO ink_transactions
+    (ink_id, ink_name, qty, action, action_date)
+    SELECT id, ink_name, %s, 'IN', %s
+    FROM ink_master WHERE id=%s
+""", (d["qty"], now(), d["id"]))
     conn.commit();cur.close();conn.close()
     return jsonify({"ok":True})
 
@@ -391,6 +445,13 @@ def ink_sell():
         UPDATE ink_stock SET qty=qty-%s,updated_at=%s
         WHERE ink_id=%s AND qty>=%s
     """,(d["qty"],now(),d["id"],d["qty"]))
+# save SELL history
+cur.execute("""
+    INSERT INTO ink_transactions
+    (ink_id, ink_name, qty, action, action_date)
+    SELECT id, ink_name, %s, 'SELL', %s
+    FROM ink_master WHERE id=%s
+""", (d["qty"], now(), d["id"]))
     conn.commit();cur.close();conn.close()
     return jsonify({"ok":True})
 
