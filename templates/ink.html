@@ -74,6 +74,20 @@
     </tr>
   </thead>
   <tbody id="stockTbl"></tbody>
+
+<th>Action</th>
+rows += `
+<tr>
+  <td>${r.model}</td>
+  <td>${r.qty}</td>
+  <td>${status}</td>
+  <td>
+    <button class="btn btn-sm btn-outline-danger"
+      onclick="deleteInk(${r.id}, '${r.model}')">
+      🗑️
+    </button>
+  </td>
+</tr>`;
 </table>
 
 <script>
@@ -181,6 +195,12 @@ async function sellStock(){
 
   qty_sell.value = "";
   avail.innerHTML = "";
+  load();
+}
+async function deleteInk(id, name){
+  if(!confirm("Delete ink model: " + name + " ?")) return;
+
+  await fetch("/api/ink/" + id, { method:"DELETE" });
   load();
 }
 
