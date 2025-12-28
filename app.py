@@ -31,8 +31,19 @@ def admin_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
-# ================= DATABASE =================
- def init_db():
+# ================= DATABASE =================   
+def get_db():
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL not set")
+
+    return psycopg2.connect(
+        db_url,
+        sslmode="require",
+        cursor_factory=psycopg2.extras.RealDictCursor
+    )
+
+def init_db():
     try:
         conn = get_db()
         cur = conn.cursor()
