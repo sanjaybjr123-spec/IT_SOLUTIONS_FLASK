@@ -80,6 +80,17 @@ def init_db():
             role TEXT
         )
         """)
+# ---- INK TRANSACTIONS (HISTORY) ----
+cur.execute("""
+CREATE TABLE IF NOT EXISTS ink_transactions(
+    id SERIAL PRIMARY KEY,
+    ink_id INTEGER,
+    model TEXT,
+    qty INTEGER,
+    action TEXT,     -- IN / SELL
+    action_date TEXT
+)
+""")
 
         # ---- DEFAULT ADMIN ----
         cur.execute("SELECT COUNT(*) c FROM users")
@@ -393,6 +404,10 @@ def ink_sell():
     """,(d["qty"],now(),d["id"],d["qty"]))
     conn.commit();cur.close();conn.close()
     return jsonify({"ok":True})
+cur.execute("""
+INSERT INTO ink_transactions(ink_id, model, qty, action, action_date)
+SELECT %s, model, %s, 'SELL', %s FROM ink_master WHERE id=%s
+""", (d["id"], d["qty"], now(), d["id"]))
 
 # ---------- ADD NEW INK MODEL ----------
 @app.post("/api/ink/model")
@@ -418,6 +433,10 @@ def add_ink_model():
     conn.close()
 
     return jsonify({"ok": True})
+cur.execute("""
+INSERT INTO ink_transactions(ink_id, model, qty, action, action_date)
+SELECT %s, model, %s, 'IN', %s FROM ink_master WHERE id=%s
+""", (d["id"], d["qty"], now(), d["id"]))
 
 # ---------- DELETE INK MODEL ----------
 @app.delete("/api/ink/<int:ink_id>")
@@ -465,7 +484,38 @@ def print_receipt(eid):
     return render_template("receipt.html", e=row_to_obj(r),
         shop={"name":"IT SOLUTIONS","addr":"GHATSILA COLLEGE ROAD"}
     )
+@app.get("/export/ink")
+@login_required
+def export_ink_history():
+    conn = get_db()
+    cur = conn.cursor()
 
+    cur.execute("""
+        SELECT action_date, model, action, qty
+        FROM ink_transactions
+        ORDER BY action_date DESC
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    si = StringIO()
+    cw = csv.writer(si)
+    cw.writerow(["Date", "Ink Model", "Action", "Quantity"])
+
+    for r in rows:
+        cw.writerow([
+            r["action_date"],
+            r["model"],
+            r["action"],
+            r["qty"]
+        ])
+
+    return Response(
+        si.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=ink_history.csv"}
+    )
 
 # ================= RUN =================
 if __name__ == "__main__":
