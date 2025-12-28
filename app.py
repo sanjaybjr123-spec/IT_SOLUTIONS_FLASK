@@ -32,18 +32,7 @@ def admin_required(fn):
     return wrapper
 
 # ================= DATABASE =================
-def get_db():
-    db_url = os.environ.get("DATABASE_URL")
-    if not db_url:
-        raise RuntimeError("DATABASE_URL not set")
-
-    return psycopg2.connect(
-        db_url,
-        sslmode="require",
-        cursor_factory=psycopg2.extras.RealDictCursor
-    )
-
-def init_db():
+ def init_db():
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -93,7 +82,7 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_master(
             id SERIAL PRIMARY KEY,
-            model TEXT UNIQUE
+            ink_name TEXT UNIQUE
         )
         """)
 
@@ -106,16 +95,17 @@ def init_db():
         )
         """)
 
-        # ---- DEFAULT INKS ----
-        cur.execute("SELECT COUNT(*) c FROM ink_master")
-        if cur.fetchone()["c"] == 0:
-            inks = [
-                "HP 680 Black", "HP 680 Color",
-                "Canon 790 Black", "Canon 790 Color",
-                "Epson 003 Black", "Epson 003 Color"
-            ]
-            for i in inks:
-                cur.execute("INSERT INTO ink_master(model) VALUES(%s)", (i,))
+        # ---- INK TRANSACTIONS (HISTORY) ✅ FIXED ----
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ink_transactions(
+            id SERIAL PRIMARY KEY,
+            ink_id INTEGER,
+            ink_name TEXT,
+            qty INTEGER,
+            action TEXT,
+            action_date TEXT
+        )
+        """)
 
         conn.commit()
         cur.close()
@@ -123,19 +113,8 @@ def init_db():
 
     except Exception as e:
         print("DB init skipped:", e)
-# ---- INK TRANSACTIONS (HISTORY) ----
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS ink_transactions(
-            id SERIAL PRIMARY KEY,
-            ink_id INTEGER,
-            ink_name TEXT,
-            qty INTEGER,
-            action TEXT,          -- IN / SELL
-            action_date TEXT
-        )
-        """)
-
-init_db()
+        
+               
 
 # ================= LOGIN =================
 @app.route("/login", methods=["GET","POST"])
