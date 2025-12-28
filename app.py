@@ -32,27 +32,17 @@ def admin_required(fn):
     return wrapper
 
 # ================= DATABASE =================
-def get_db():
-    db_url = os.environ.get("DATABASE_URL")
-    if not db_url:
-        raise RuntimeError("DATABASE_URL not set")
-
-    return psycopg2.connect(
-        db_url,
-        sslmode="require",
-        cursor_factory=psycopg2.extras.RealDictCursor
-    )
-
 def init_db():
     try:
         conn = get_db()
         cur = conn.cursor()
 
-        # ---- MAIN TABLES ----
+        # -------- MAIN TABLES --------
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
             id SERIAL PRIMARY KEY,
-            type TEXT, customer TEXT, phone TEXT, model TEXT, problem TEXT,
+            type TEXT, customer TEXT, phone TEXT,
+            model TEXT, problem TEXT,
             receive_date TEXT,
             out_date TEXT,
             in_date TEXT,
@@ -67,8 +57,13 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
             id SERIAL PRIMARY KEY,
-            sale_date TEXT, item TEXT, qty REAL, rate REAL,
-            amount REAL, payment_mode TEXT, note TEXT
+            sale_date TEXT,
+            item TEXT,
+            qty REAL,
+            rate REAL,
+            amount REAL,
+            payment_mode TEXT,
+            note TEXT
         )
         """)
 
@@ -80,27 +75,8 @@ def init_db():
             role TEXT
         )
         """)
-# ---- INK TRANSACTIONS (HISTORY) ----
-cur.execute("""
-CREATE TABLE IF NOT EXISTS ink_transactions(
-    id SERIAL PRIMARY KEY,
-    ink_id INTEGER,
-    model TEXT,
-    qty INTEGER,
-    action TEXT,     -- IN / SELL
-    action_date TEXT
-)
-""")
 
-        # ---- DEFAULT ADMIN ----
-        cur.execute("SELECT COUNT(*) c FROM users")
-        if cur.fetchone()["c"] == 0:
-            cur.execute(
-                "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
-                ("admin", generate_password_hash("admin@123"), "admin")
-            )
-
-        # ---- INK MASTER ----
+        # -------- INK TABLES --------
         cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_master(
             id SERIAL PRIMARY KEY,
@@ -108,7 +84,6 @@ CREATE TABLE IF NOT EXISTS ink_transactions(
         )
         """)
 
-        # ---- INK STOCK ----
         cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_stock(
             ink_id INTEGER PRIMARY KEY,
@@ -117,7 +92,26 @@ CREATE TABLE IF NOT EXISTS ink_transactions(
         )
         """)
 
-        # ---- DEFAULT INKS ----
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ink_transactions(
+            id SERIAL PRIMARY KEY,
+            ink_id INTEGER,
+            model TEXT,
+            qty INTEGER,
+            action TEXT,
+            action_date TEXT
+        )
+        """)
+
+        # -------- DEFAULT ADMIN --------
+        cur.execute("SELECT COUNT(*) c FROM users")
+        if cur.fetchone()["c"] == 0:
+            cur.execute(
+                "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
+                ("admin", generate_password_hash("admin@123"), "admin")
+            )
+
+        # -------- DEFAULT INKS --------
         cur.execute("SELECT COUNT(*) c FROM ink_master")
         if cur.fetchone()["c"] == 0:
             inks = [
@@ -126,16 +120,20 @@ CREATE TABLE IF NOT EXISTS ink_transactions(
                 "Epson 003 Black", "Epson 003 Color"
             ]
             for i in inks:
-                cur.execute("INSERT INTO ink_master(model) VALUES(%s)", (i,))
+                cur.execute(
+                    "INSERT INTO ink_master(model) VALUES(%s)",
+                    (i,)
+                )
 
         conn.commit()
         cur.close()
         conn.close()
 
     except Exception as e:
-        print("DB init skipped:", e)
-
-init_db()
+        print("DB init error:", e)
+            
+            
+        
 
 # ================= LOGIN =================
 @app.route("/login", methods=["GET","POST"])
