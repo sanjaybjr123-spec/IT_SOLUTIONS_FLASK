@@ -71,23 +71,13 @@
       <th>Ink</th>
       <th>Qty</th>
       <th>Status</th>
+      <th>Action</th>
     </tr>
   </thead>
   <tbody id="stockTbl"></tbody>
 
-<th>Action</th>
-rows += `
-<tr>
-  <td>${r.model}</td>
-  <td>${r.qty}</td>
-  <td>${status}</td>
-  <td>
-    <button class="btn btn-sm btn-outline-danger"
-      onclick="deleteInk(${r.id}, '${r.model}')">
-      🗑️
-    </button>
-  </td>
-</tr>`;
+
+
 </table>
 
 <script>
@@ -127,6 +117,18 @@ async function load(){
   ink_sell.innerHTML = optSell;
   stockTbl.innerHTML = rows;
 }
+rows += `
+<tr>
+  <td>${r.model}</td>
+  <td>${r.qty}</td>
+  <td>${status}</td>
+  <td>
+    <button class="btn btn-sm btn-outline-danger"
+      onclick="deleteInk(${r.id}, '${r.model}')">
+      🗑️
+    </button>
+  </td>
+</tr>`;
 
 function showQty(){
   const x = inkCache.find(i=>i.id == ink_sell.value);
