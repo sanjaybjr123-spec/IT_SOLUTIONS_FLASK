@@ -9,9 +9,7 @@
   <div class="d-flex gap-2">
     <input id="newInk" class="form-control"
            placeholder="Ink Model Name (e.g. HP 680 Black)">
-    <button class="btn btn-primary" onclick="addInkModel()">
-      ➕ Add
-    </button>
+    <button class="btn btn-primary" onclick="addInkModel()">➕ Add</button>
   </div>
 </div>
 
@@ -21,19 +19,10 @@
   <div class="col-md-6">
     <div class="card p-3">
       <h6>Add Ink Stock</h6>
-
-      <select id="ink_in" class="form-select mb-2">
-        <option value="">Select Ink</option>
-      </select>
-
-      <input id="qty_in" type="number" class="form-control mb-2"
-             placeholder="Quantity">
-
+      <select id="ink_in" class="form-select mb-2"></select>
+      <input id="qty_in" type="number" class="form-control mb-2" placeholder="Quantity">
       <input id="date_in" type="date" class="form-control mb-2">
-
-      <button class="btn btn-success w-100" onclick="addStock()">
-        ➕ ADD STOCK
-      </button>
+      <button class="btn btn-success w-100" onclick="addStock()">➕ ADD STOCK</button>
     </div>
   </div>
 
@@ -41,22 +30,11 @@
   <div class="col-md-6">
     <div class="card p-3">
       <h6>Sell Ink</h6>
-
-      <select id="ink_sell" class="form-select mb-2"
-              onchange="showQty()">
-        <option value="">Select Ink</option>
-      </select>
-
+      <select id="ink_sell" class="form-select mb-2" onchange="showQty()"></select>
       <div id="avail" class="mb-2 text-muted"></div>
-
-      <input id="qty_sell" type="number" class="form-control mb-2"
-             placeholder="Sell Quantity">
-
+      <input id="qty_sell" type="number" class="form-control mb-2" placeholder="Sell Quantity">
       <input id="date_sell" type="date" class="form-control mb-2">
-
-      <button class="btn btn-danger w-100" onclick="sellStock()">
-        💸 SELL INK
-      </button>
+      <button class="btn btn-danger w-100" onclick="sellStock()">💸 SELL INK</button>
     </div>
   </div>
 
@@ -75,31 +53,26 @@
     </tr>
   </thead>
   <tbody id="stockTbl"></tbody>
-
-
-
 </table>
 
 <script>
-async function api(url, options={}){
+async function api(url, options = {}) {
   const r = await fetch(url, options);
   return await r.json();
 }
 
 let inkCache = [];
 
-async function load(){
+async function load() {
   inkCache = await api("/api/ink");
 
   let optIn = '<option value="">Select Ink</option>';
   let optSell = '<option value="">Select Ink</option>';
   let rows = "";
 
-  inkCache.forEach(r=>{
+  inkCache.forEach(r => {
     optIn += `<option value="${r.id}">${r.model}</option>`;
-    if(r.qty > 0){
-      optSell += `<option value="${r.id}">${r.model}</option>`;
-    }
+    if (r.qty > 0) optSell += `<option value="${r.id}">${r.model}</option>`;
 
     let status =
       r.qty < 5 ? "🔴 Low" :
@@ -110,6 +83,12 @@ async function load(){
         <td>${r.model}</td>
         <td>${r.qty}</td>
         <td>${status}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-danger"
+            onclick="deleteInk(${r.id}, '${r.model}')">
+            🗑️
+          </button>
+        </td>
       </tr>`;
   });
 
@@ -117,92 +96,62 @@ async function load(){
   ink_sell.innerHTML = optSell;
   stockTbl.innerHTML = rows;
 }
-rows += `
-<tr>
-  <td>${r.model}</td>
-  <td>${r.qty}</td>
-  <td>${status}</td>
-  <td>
-    <button class="btn btn-sm btn-outline-danger"
-      onclick="deleteInk(${r.id}, '${r.model}')">
-      🗑️
-    </button>
-  </td>
-</tr>`;
 
-function showQty(){
-  const x = inkCache.find(i=>i.id == ink_sell.value);
+function showQty() {
+  const x = inkCache.find(i => i.id == ink_sell.value);
   avail.innerHTML = x ? "Available: " + x.qty : "";
 }
 
-async function addInkModel(){
-  const name = newInk.value.trim();
-  if(!name){
-    alert("Ink model name likhiye");
-    return;
-  }
+async function addInkModel() {
+  if (!newInk.value.trim()) return alert("Ink model name likhiye");
 
-  await api("/api/ink/model",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ model:name })
+  await api("/api/ink/model", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: newInk.value.trim() })
   });
 
   newInk.value = "";
   load();
 }
 
-async function addStock(){
-  if(!ink_in.value || !qty_in.value || !date_in.value){
-    alert("Ink, Quantity aur Date mandatory hai");
-    return;
-  }
+async function addStock() {
+  if (!ink_in.value || !qty_in.value || !date_in.value)
+    return alert("Ink, Quantity aur Date mandatory hai");
 
-  await api("/api/ink/in",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      id: ink_in.value,
-      qty: qty_in.value,
-      date: date_in.value   // future use ke liye
-    })
+  await api("/api/ink/in", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: ink_in.value, qty: qty_in.value })
   });
 
   qty_in.value = "";
   load();
 }
 
-async function sellStock(){
-  const ink = inkCache.find(i=>i.id == ink_sell.value);
+async function sellStock() {
+  const ink = inkCache.find(i => i.id == ink_sell.value);
+  if (!ink_sell.value || !qty_sell.value || !date_sell.value)
+    return alert("Ink, Quantity aur Date mandatory hai");
 
-  if(!ink_sell.value || !qty_sell.value || !date_sell.value){
-    alert("Ink, Quantity aur Date mandatory hai");
-    return;
-  }
+  if (+qty_sell.value > ink.qty)
+    return alert("Available stock se zyada sell nahi ho sakta");
 
-  if(Number(qty_sell.value) > ink.qty){
-    alert("Available stock se zyada sell nahi ho sakta");
-    return;
-  }
-
-  await api("/api/ink/sell",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      id: ink_sell.value,
-      qty: qty_sell.value,
-      date: date_sell.value
-    })
+  await api("/api/ink/sell", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: ink_sell.value, qty: qty_sell.value })
   });
 
   qty_sell.value = "";
   avail.innerHTML = "";
   load();
 }
-async function deleteInk(id, name){
-  if(!confirm("Delete ink model: " + name + " ?")) return;
 
-  await fetch("/api/ink/" + id, { method:"DELETE" });
+async function deleteInk(id, name) {
+  if (!confirm("Delete ink model: " + name + " ?")) return;
+
+  await fetch("/api/ink/" + id, { method: "DELETE" });
   load();
 }
 
