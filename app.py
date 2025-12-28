@@ -48,7 +48,17 @@ def init_db():
         conn = get_db()
         cur = conn.cursor()
 
-        # ---- MAIN TABLES ----
+        # ---- USERS ----
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            role TEXT
+        )
+        """)
+
+        # ---- ENTRIES ----
         cur.execute("""
         CREATE TABLE IF NOT EXISTS entries(
             id SERIAL PRIMARY KEY,
@@ -64,30 +74,19 @@ def init_db():
         )
         """)
 
+        # ---- SALES ----
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sales(
             id SERIAL PRIMARY KEY,
-            sale_date TEXT, item TEXT, qty REAL, rate REAL,
-            amount REAL, payment_mode TEXT, note TEXT
+            sale_date TEXT,
+            item TEXT,
+            qty REAL,
+            rate REAL,
+            amount REAL,
+            payment_mode TEXT,
+            note TEXT
         )
         """)
-
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS users(
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE,
-            password_hash TEXT,
-            role TEXT
-        )
-        """)
-
-        # ---- DEFAULT ADMIN ----
-        cur.execute("SELECT COUNT(*) c FROM users")
-        if cur.fetchone()["c"] == 0:
-            cur.execute(
-                "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
-                ("admin", generate_password_hash("admin@123"), "admin")
-            )
 
         # ---- INK MASTER ----
         cur.execute("""
@@ -106,7 +105,7 @@ def init_db():
         )
         """)
 
-        # ---- INK TRANSACTIONS (HISTORY) ✅ FIXED ----
+        # ✅ ---- INK TRANSACTIONS (VERY IMPORTANT) ----
         cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_transactions(
             id SERIAL PRIMARY KEY,
@@ -118,12 +117,24 @@ def init_db():
         )
         """)
 
+        # ---- DEFAULT ADMIN ----
+        cur.execute("SELECT COUNT(*) c FROM users")
+        if cur.fetchone()["c"] == 0:
+            cur.execute(
+                "INSERT INTO users(username,password_hash,role) VALUES(%s,%s,%s)",
+                ("admin", generate_password_hash("admin@123"), "admin")
+            )
+
         conn.commit()
         cur.close()
         conn.close()
 
+        print("DB init done")
+
     except Exception as e:
         print("DB init skipped:", e)
+        
+        
         
                
 
