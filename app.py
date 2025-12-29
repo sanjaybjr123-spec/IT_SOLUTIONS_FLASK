@@ -223,6 +223,53 @@ def dashboard():
         "ledger_bal": 0
     })
 
+@app.get("/api/dashboard-warnings")
+@login_required
+def dashboard_warnings():
+    conn = get_db()
+    cur = conn.cursor()
+
+    warnings = []
+
+    # OUT devices (abhi tak dukan me nahi aaye)
+    cur.execute("""
+        SELECT customer, model, type
+        FROM entries
+        WHERE status = 'Out'
+    """)
+    for r in cur.fetchall():
+        warnings.append(
+            f"⚠️ ग्राहक {r['customer']} का {r['type']} ({r['model']}) अभी तक दुकान में नहीं आया है"
+        )
+
+    # READY but not delivered
+    cur.execute("""
+        SELECT customer, model, type
+        FROM entries
+        WHERE status = 'Ready'
+    """)
+    for r in cur.fetchall():
+        warnings.append(
+            f"📦 ग्राहक {r['customer']} का {r['type']} ({r['model']}) तैयार है लेकिन अभी तक लिया नहीं गया है"
+        )
+
+    # INK zero stock
+    cur.execute("""
+        SELECT ink_name
+        FROM ink_master m
+        LEFT JOIN ink_stock s ON m.id = s.ink_id
+        WHERE COALESCE(s.qty,0) = 0
+    """)
+    for r in cur.fetchall():
+        warnings.append(
+            f"🖨️ इंक {r['ink_name']} पूरी तरह खत्म हो चुकी है"
+        )
+
+    cur.close()
+    conn.close()
+
+    return jsonify(warnings)
+
 # ================= SERVICE =================
 @app.route("/service")
 @login_required
