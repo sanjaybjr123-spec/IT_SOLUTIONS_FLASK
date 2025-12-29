@@ -422,6 +422,8 @@ def ink_list():
 def ink_in():
     d = request.get_json(force=True)
 
+    action_date = d.get("date") or now()
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -452,6 +454,8 @@ def ink_in():
 @login_required
 def ink_sell():
     d = request.get_json(force=True)
+
+    action_date = d.get("date") or now()
 
     conn = get_db()
     cur = conn.cursor()
