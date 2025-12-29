@@ -119,7 +119,67 @@
 
   <div id="inkGrid" class="row g-3"></div>
 </div>
+<!-- ⚠️ LIVE WARNING BANNER -->
+<div class="card mt-3 p-2 bg-light border">
+  <div class="warning-wrap">
+    <div id="warningText" class="warning-text"></div>
+  </div>
+</div>
 
+<style>
+.warning-wrap{
+  overflow:hidden;
+  white-space:nowrap;
+}
+.warning-text{
+  display:inline-block;
+  padding-left:100%;
+  animation:scroll-left 25s linear infinite;
+  font-weight:600;
+  color:#b91c1c;
+  font-size:15px;
+}
+@keyframes scroll-left{
+  0%{transform:translateX(0)}
+  100%{transform:translateX(-100%)}
+}
+</style>
+
+<script>
+async function loadWarnings(){
+  let msgs = [];
+
+  /* 🔴 INK = 0 ALERT */
+  const inkRes = await fetch("/api/ink");
+  const inks = await inkRes.json();
+  inks.forEach(i=>{
+    if(i.qty === 0){
+      msgs.push(`⚠️ सूचना: Ink ${i.model} पूरी तरह समाप्त हो चुकी है`);
+    }
+  });
+
+  /* 🔴 SERVICE / DEVICE ALERT */
+  const overRes = await fetch("/api/overdue");
+  const services = await overRes.json();
+
+  services.forEach(e=>{
+    if(e.status === "Out"){
+      msgs.push(`⚠️ सूचना: ग्राहक का ${e.type || "उपकरण"} (Model: ${e.model}) अभी तक दुकान में प्राप्त नहीं हुआ है`);
+    }
+    if(e.status === "Ready"){
+      msgs.push(`⚠️ सूचना: ग्राहक का ${e.type || "उपकरण"} (Model: ${e.model}) तैयार है लेकिन अभी तक लिया नहीं गया है`);
+    }
+  });
+
+  if(msgs.length === 0){
+    msgs.push("✅ सभी सर्विस और इंक स्टॉक की स्थिति सामान्य है");
+  }
+
+  document.getElementById("warningText").innerHTML = msgs.join(" &nbsp; | &nbsp; ");
+}
+
+loadWarnings();
+</script>
 <style>
 .ink-box{
   border-radius:12px;
