@@ -125,15 +125,31 @@
 </div>
 
 <style>
-.scroll-text{
-  white-space:nowrap;
+.warning-wrap{
+  width:100%;
+  overflow:hidden;
+  background:#2563eb; /* BLUE background */
+  border-radius:10px;
+  margin-top:12px;
+}
+
+.warning-marquee{
   display:inline-block;
-  animation: scroll 18s linear infinite;
+  white-space:nowrap;
+  padding-left:100%;
+  animation:scroll-left 25s linear infinite;
+  color:#dc2626; /* RED text */
+  font-weight:700;
   font-size:15px;
 }
-@keyframes scroll{
-  0%{transform:translateX(100%)}
-  100%{transform:translateX(-100%)}
+
+@keyframes scroll-left{
+  0%{
+    transform:translateX(0);
+  }
+  100%{
+    transform:translateX(-100%);
+  }
 }
 </style>
 
