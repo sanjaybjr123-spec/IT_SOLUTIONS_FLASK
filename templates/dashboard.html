@@ -113,4 +113,71 @@
   </div>
 </div>
 
+<!-- INK STOCK OVERVIEW -->
+<div class="card mt-4 p-3">
+  <h5 class="mb-3">Ink Stock Overview</h5>
+
+  <div id="inkGrid" class="row g-3"></div>
+</div>
+
+<style>
+.ink-box{
+  border-radius:12px;
+  padding:16px;
+  color:#fff;
+  font-weight:600;
+  text-align:center;
+}
+.ink-red{background:#dc2626;}
+.ink-orange{background:#f97316;}
+.ink-green{background:#16a34a;}
+
+.blink{
+  animation:blink 1s infinite;
+}
+@keyframes blink{
+  0%{opacity:1}
+  50%{opacity:.4}
+  100%{opacity:1}
+}
+</style>
+
+<script>
+async function loadInkDashboard(){
+  const res = await fetch("/api/ink");
+  const data = await res.json();
+
+  let html = "";
+
+  data.forEach(i=>{
+    let cls = "ink-green";
+    let blink = "";
+
+    if(i.qty === 0){
+      cls = "ink-red";
+      blink = "blink";
+    }
+    else if(i.qty <= 5){
+      cls = "ink-red";
+    }
+    else if(i.qty <= 9){
+      cls = "ink-orange";
+    }
+
+    html += `
+      <div class="col-6 col-md-3">
+        <div class="ink-box ${cls} ${blink}">
+          ${i.model}<br>
+          Qty: ${i.qty}
+        </div>
+      </div>
+    `;
+  });
+
+  document.getElementById("inkGrid").innerHTML = html;
+}
+
+loadInkDashboard();
+</script>
+
 {% endblock %}
