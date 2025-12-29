@@ -120,10 +120,8 @@
   <div id="inkGrid" class="row g-3"></div>
 </div>
 <!-- ⚠️ LIVE WARNING BANNER -->
-
-<div class="card mt-3 p-2 bg-light border">
-  <div class="warning-wrap">
-    <div id="warnText" class="scroll-text fw-bold"></div>
+<div class="card mt-3 p-2 bg-danger text-white overflow-hidden">
+  <div id="warnText" class="scroll-text fw-bold"></div>
 </div>
 
 <style>
@@ -154,6 +152,8 @@ async function loadWarnings(){
 
 loadWarnings();
 </script>
+
+
    
 <style>
 .ink-box{
