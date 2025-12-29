@@ -439,7 +439,7 @@ def ink_in():
         (ink_id, ink_name, qty, action, action_date)
         SELECT id, ink_name, %s, 'IN', %s
         FROM ink_master WHERE id=%s
-    """, (d["qty"], now(), d["id"]))
+    """, (d["qty"], action_date, d["id"]))
 
     conn.commit()
     cur.close()
@@ -469,7 +469,7 @@ def ink_sell():
         (ink_id, ink_name, qty, action, action_date)
         SELECT id, ink_name, %s, 'SELL', %s
         FROM ink_master WHERE id=%s
-    """, (d["qty"], now(), d["id"]))
+    """, (d["qty"], action_date, d["id"]))
 
     conn.commit()
     cur.close()
