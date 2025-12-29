@@ -121,19 +121,27 @@
 </div>
 <!-- ⚠️ LIVE WARNING BANNER -->
 
-<div class="card mt-3 p-2 bg-danger text-white overflow-hidden">
-  <div id="warnText" class="scroll-text fw-bold"></div>
+<div class="card mt-3 p-2 bg-light border">
+  <div class="warning-wrap">
+    <div id="warningText" class="warning-text"></div>
+  </div>
 </div>
 
 <style>
-.scroll-text{
+.warning-wrap{
+  overflow:hidden;
   white-space:nowrap;
+}
+.warning-text{
   display:inline-block;
-  animation: scroll 18s linear infinite;
+  padding-left:100%;
+  animation:scroll-left 25s linear infinite;
+  font-weight:600;
+  color:#b91c1c;
   font-size:15px;
 }
-@keyframes scroll{
-  0%{transform:translateX(100%)}
+@keyframes scroll-left{
+  0%{transform:translateX(0)}
   100%{transform:translateX(-100%)}
 }
 </style>
