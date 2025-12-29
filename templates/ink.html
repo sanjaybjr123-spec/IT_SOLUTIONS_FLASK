@@ -12,6 +12,7 @@
     <button class="btn btn-primary" onclick="addInkModel()">➕ Add</button>
   </div>
 </div>
+
 <a href="/export/ink" class="btn btn-outline-primary mb-3">
   ⬇️ Export Ink History
 </a>
@@ -118,6 +119,7 @@ async function addInkModel() {
   load();
 }
 
+/* ✅ FIXED: DATE BACKEND KO JA RAHI HAI */
 async function addStock() {
   if (!ink_in.value || !qty_in.value || !date_in.value)
     return alert("Ink, Quantity aur Date mandatory hai");
@@ -125,15 +127,21 @@ async function addStock() {
   await api("/api/ink/in", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: ink_in.value, qty: qty_in.value })
+    body: JSON.stringify({
+      id: ink_in.value,
+      qty: parseInt(qty_in.value),
+      date: date_in.value + " 00:00:00"
+    })
   });
 
   qty_in.value = "";
   load();
 }
 
+/* ✅ FIXED: DATE BACKEND KO JA RAHI HAI */
 async function sellStock() {
   const ink = inkCache.find(i => i.id == ink_sell.value);
+
   if (!ink_sell.value || !qty_sell.value || !date_sell.value)
     return alert("Ink, Quantity aur Date mandatory hai");
 
@@ -143,7 +151,11 @@ async function sellStock() {
   await api("/api/ink/sell", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: ink_sell.value, qty: qty_sell.value })
+    body: JSON.stringify({
+      id: ink_sell.value,
+      qty: parseInt(qty_sell.value),
+      date: date_sell.value + " 00:00:00"
+    })
   });
 
   qty_sell.value = "";
@@ -153,7 +165,6 @@ async function sellStock() {
 
 async function deleteInk(id, name) {
   if (!confirm("Delete ink model: " + name + " ?")) return;
-
   await fetch("/api/ink/" + id, { method: "DELETE" });
   load();
 }
