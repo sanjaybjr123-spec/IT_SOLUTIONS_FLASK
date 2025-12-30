@@ -620,19 +620,7 @@ def print_receipt(eid):
     return render_template("receipt.html", e=row_to_obj(r),
         shop={"name":"IT SOLUTIONS","addr":"GHATSILA COLLEGE ROAD"}
     )
-@app.get("/api/customers")
-@login_required
-def search_customers():
-    q = request.args.get("q", "")
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("""
-        SELECT * FROM customers
-        WHERE name ILIKE %s OR mobile ILIKE %s
-        ORDER BY name
-    """, (f"%{q}%", f"%{q}%"))
-    rows = cur.fetchall()
-    cur.close(); conn.close()
-    return jsonify(rows)
+
 
 # ================= CUSTOMERS API =================
 
