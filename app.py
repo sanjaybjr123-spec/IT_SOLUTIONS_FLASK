@@ -635,22 +635,45 @@ def search_customers():
     cur.close(); conn.close()
     return jsonify(rows)
 
+# ================= CUSTOMERS API =================
+
 @app.post("/api/customers")
 @login_required
 def add_customer():
     d = request.get_json(force=True)
-    conn = get_db(); cur = conn.cursor()
-    cur.execute("SELECT id FROM customers WHERE mobile=%s", (d["mobile"],))
-    if cur.fetchone():
-        return jsonify({"error": "Customer already exists"}), 400
+    conn = get_db()
+    cur = conn.cursor()
 
     cur.execute("""
         INSERT INTO customers(name, mobile, address)
-        VALUES(%s, %s, %s)
-    """, (d["name"], d["mobile"], d.get("address", "")))
+        VALUES(%s,%s,%s)
+        ON CONFLICT (mobile) DO NOTHING
+    """, (d["name"], d["mobile"], d["address"]))
+
     conn.commit()
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
     return jsonify({"ok": True})
+
+
+@app.get("/api/customers/search")
+@login_required
+def search_customer():
+    q = request.args.get("q","")
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT * FROM customers
+        WHERE name ILIKE %s OR mobile ILIKE %s
+        ORDER BY name
+        LIMIT 10
+    """, ("%"+q+"%", "%"+q+"%"))
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify(rows)
 
 @app.get("/api/ledger/<int:cid>")
 @login_required
