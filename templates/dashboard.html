@@ -120,50 +120,69 @@
   <div id="inkGrid" class="row g-3"></div>
 </div>
 <!-- ⚠️ LIVE WARNING BANNER -->
-<div class="card mt-3 p-2 bg-danger text-white overflow-hidden">
-  <div id="warnText" class="scroll-text fw-bold"></div>
+
+<div class="warning-wrap">
+  <div class="warning-track" id="warningText">
+    ⚠️ Loading warnings...
+  </div>
 </div>
 
 <style>
 .warning-wrap{
   width:100%;
   overflow:hidden;
-  background:#2563eb; /* BLUE background */
+  background:#1d4ed8; /* BLUE */
   border-radius:10px;
   margin-top:12px;
+  padding:10px 0;
 }
 
-.warning-marquee{
+.warning-track{
   display:inline-block;
   white-space:nowrap;
-  padding-left:100%;
-  animation:scroll-left 25s linear infinite;
-  color:#dc2626; /* RED text */
-  font-weight:700;
+  color:#dc2626; /* RED TEXT */
   font-size:15px;
+  font-weight:700;
+  padding-left:100%;
+  animation: warningScroll 30s linear infinite;
 }
 
-@keyframes scroll-left{
+@keyframes warningScroll{
   0%{
-    transform:translateX(0);
+    transform: translateX(0);
   }
   100%{
-    transform:translateX(-100%);
+    transform: translateX(-100%);
   }
 }
 </style>
 
 <script>
 async function loadWarnings(){
-  const r = await fetch("/api/dashboard-warnings");
-  const data = await r.json();
+  let msgs = [];
 
-  if(data.length === 0){
-    document.getElementById("warnText").innerText =
-      "✅ कोई भी Service या Ink से जुड़ी चेतावनी नहीं है";
-  }else{
-    document.getElementById("warnText").innerText = data.join("   🔹   ");
-  }
+  // 🔧 SERVICE WARNINGS
+  const entries = await fetch("/api/entries").then(r=>r.json());
+
+  entries.forEach(e=>{
+    if(e.status === "Out"){
+      msgs.push(`⚠️ ग्राहक ${e.customer} का ${e.type} (${e.model}) अभी तक दुकान में नहीं आया है`);
+    }
+    if(e.status === "Ready"){
+      msgs.push(`⚠️ ग्राहक ${e.customer} का ${e.type} (${e.model}) तैयार है लेकिन अभी तक ले गया नहीं है`);
+    }
+  });
+
+  // 🖨️ INK WARNINGS
+  const inks = await fetch("/api/ink").then(r=>r.json());
+  inks.forEach(i=>{
+    if(i.qty === 0){
+      msgs.push(`🖨️ इंक ${i.model} पूरी तरह खत्म हो चुका है`);
+    }
+  });
+
+  document.getElementById("warningText").innerText =
+    msgs.length ? msgs.join("   🔹   ") : "✅ अभी कोई चेतावनी नहीं है";
 }
 
 loadWarnings();
