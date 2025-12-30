@@ -658,21 +658,29 @@ def add_customer():
 
 @app.get("/api/customers/search")
 @login_required
-def search_customer():
-    q = request.args.get("q","")
+def search_customers():
+    q = request.args.get("q","").strip()
+    if not q:
+        return jsonify([])
+
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT * FROM customers
-        WHERE name ILIKE %s OR mobile ILIKE %s
-        ORDER BY name
+        SELECT id,
+               customer AS name,
+               phone AS mobile
+        FROM customers
+        WHERE customer ILIKE %s
+           OR phone ILIKE %s
+        ORDER BY customer
         LIMIT 10
-    """, ("%"+q+"%", "%"+q+"%"))
+    """, (f"%{q}%", f"%{q}%"))
 
     rows = cur.fetchall()
     cur.close()
     conn.close()
+
     return jsonify(rows)
 
 @app.get("/api/ledger/<int:cid>")
