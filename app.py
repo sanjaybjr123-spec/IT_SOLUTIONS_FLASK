@@ -42,7 +42,6 @@ def get_db():
         sslmode="require",
         cursor_factory=psycopg2.extras.RealDictCursor
     )
-
 def init_db():
     try:
         conn = get_db()
@@ -88,7 +87,29 @@ def init_db():
         )
         """)
 
-        # ---- INK MASTER ----
+        # ---- CUSTOMERS ----
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS customers(
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            mobile TEXT UNIQUE,
+            address TEXT
+        )
+        """)
+
+        # ---- LEDGER ----
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ledger(
+            id SERIAL PRIMARY KEY,
+            customer_id INTEGER,
+            entry_date TEXT,
+            remark TEXT,
+            dr REAL DEFAULT 0,
+            cr REAL DEFAULT 0
+        )
+        """)
+
+        # ---- INK ----
         cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_master(
             id SERIAL PRIMARY KEY,
@@ -96,7 +117,6 @@ def init_db():
         )
         """)
 
-        # ---- INK STOCK ----
         cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_stock(
             ink_id INTEGER PRIMARY KEY,
@@ -105,7 +125,6 @@ def init_db():
         )
         """)
 
-        # ✅ ---- INK TRANSACTIONS (VERY IMPORTANT) ----
         cur.execute("""
         CREATE TABLE IF NOT EXISTS ink_transactions(
             id SERIAL PRIMARY KEY,
@@ -133,28 +152,8 @@ def init_db():
 
     except Exception as e:
         print("DB init skipped:", e)
-
-# ---- CUSTOMERS ----
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS customers(
-            id SERIAL PRIMARY KEY,
-            name TEXT,
-            mobile TEXT UNIQUE,
-            address TEXT
-        )
-        """)
-
-        # ---- LEDGER ----
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS ledger(
-            id SERIAL PRIMARY KEY,
-            customer_id INTEGER,
-            entry_date TEXT,
-            remark TEXT,
-            dr REAL DEFAULT 0,
-            cr REAL DEFAULT 0
-        )
-        """)
+   
+    
 
 init_db()
         
@@ -637,25 +636,6 @@ def search_customers():
 
 # ================= CUSTOMERS API =================
 
-@app.post("/api/customers")
-@login_required
-def add_customer():
-    d = request.get_json(force=True)
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO customers(name, mobile, address)
-        VALUES(%s,%s,%s)
-        ON CONFLICT (mobile) DO NOTHING
-    """, (d["name"], d["mobile"], d["address"]))
-
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"ok": True})
-
-
 @app.get("/api/customers/search")
 @login_required
 def search_customers():
@@ -667,13 +647,11 @@ def search_customers():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT id,
-               customer AS name,
-               phone AS mobile
+        SELECT id, name, mobile
         FROM customers
-        WHERE customer ILIKE %s
-           OR phone ILIKE %s
-        ORDER BY customer
+        WHERE name ILIKE %s
+           OR mobile ILIKE %s
+        ORDER BY name
         LIMIT 10
     """, (f"%{q}%", f"%{q}%"))
 
@@ -682,6 +660,8 @@ def search_customers():
     conn.close()
 
     return jsonify(rows)
+
+    
 
 @app.get("/api/ledger/<int:cid>")
 @login_required
