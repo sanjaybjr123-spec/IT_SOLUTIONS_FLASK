@@ -3,51 +3,110 @@
 
 <h4 class="mb-3">📒 Ledger</h4>
 
-<div class="card p-3 mb-3">
+<!-- SEARCH + ADD BUTTON -->
+<div class="d-flex gap-2 mb-3">
   <input id="search" class="form-control"
          placeholder="Search customer by name / mobile"
          onkeyup="searchCustomer()">
-</div>
-
-<div id="results" class="list-group mb-4"></div>
-
-<hr>
-
-<div class="card p-3">
-  <h6>➕ Add New Customer</h6>
-
-  <input id="c_name" class="form-control mb-2" placeholder="Customer Name">
-  <input id="c_mobile" class="form-control mb-2" placeholder="Mobile No">
-  <input id="c_address" class="form-control mb-2" placeholder="Address">
-
-  <button class="btn btn-success" onclick="addCustomer()">
-    Add Customer
+  <button class="btn btn-primary" onclick="openAddCustomer()">
+    ➕ Add Customer
   </button>
 </div>
 
+<!-- CUSTOMER LIST -->
+<div id="results" class="list-group mb-4"></div>
+
+<!-- ADD CUSTOMER MODAL -->
+<div id="addModal" class="modal-box d-none">
+  <div class="modal-card">
+    <h6>Add New Customer</h6>
+
+    <input id="c_name" class="form-control mb-2" placeholder="Customer Name">
+    <input id="c_mobile" class="form-control mb-2" placeholder="Mobile No">
+    <input id="c_address" class="form-control mb-2" placeholder="Address">
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-success" onclick="addCustomer()">Save</button>
+      <button class="btn btn-secondary" onclick="closeAddCustomer()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEDGER ENTRY MODAL -->
+<div id="ledgerModal" class="modal-box d-none">
+  <div class="modal-card">
+    <h6 id="ledgerTitle"></h6>
+
+    <input id="l_date" type="date" class="form-control mb-2">
+    <input id="l_remark" class="form-control mb-2" placeholder="Remark">
+
+    <select id="l_type" class="form-select mb-2">
+      <option value="DR">Debit (DR)</option>
+      <option value="CR">Credit (CR)</option>
+    </select>
+
+    <input id="l_amount" type="number" class="form-control mb-2" placeholder="Amount">
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-success">Save Entry</button>
+      <button class="btn btn-secondary" onclick="closeLedger()">Close</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.modal-box{
+  position:fixed;
+  top:0;left:0;
+  width:100%;height:100%;
+  background:rgba(0,0,0,.4);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:999;
+}
+.modal-card{
+  background:#fff;
+  padding:20px;
+  width:95%;
+  max-width:400px;
+  border-radius:10px;
+}
+.d-none{display:none;}
+</style>
+
 <script>
+let currentCustomer = null;
+
 async function searchCustomer(){
   const q = search.value;
-  if(q.length < 2){
-    results.innerHTML = "";
+  if(q.length < 1){
+    results.innerHTML="";
     return;
   }
 
   const r = await fetch(`/api/customers/search?q=${q}`);
   const data = await r.json();
 
-  let html = "";
+  let html="";
   data.forEach(c=>{
-    html += `
-      <div class="list-group-item">
+    html+=`
+      <button class="list-group-item list-group-item-action"
+        onclick="openLedger(${c.id}, '${c.name}')">
         <b>${c.name}</b><br>
-        📞 ${c.mobile}<br>
-        🏠 ${c.address}
-      </div>
+        📞 ${c.mobile}
+      </button>
     `;
   });
 
   results.innerHTML = html || "<div class='text-muted'>No customer found</div>";
+}
+
+function openAddCustomer(){
+  addModal.classList.remove("d-none");
+}
+function closeAddCustomer(){
+  addModal.classList.add("d-none");
 }
 
 async function addCustomer(){
@@ -67,8 +126,17 @@ async function addCustomer(){
   c_name.value="";
   c_mobile.value="";
   c_address.value="";
+  closeAddCustomer();
+  alert("Customer Added");
+}
 
-  alert("Customer added");
+function openLedger(id,name){
+  currentCustomer=id;
+  ledgerTitle.innerText = "Ledger Entry : " + name;
+  ledgerModal.classList.remove("d-none");
+}
+function closeLedger(){
+  ledgerModal.classList.add("d-none");
 }
 </script>
 
