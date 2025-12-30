@@ -637,12 +637,12 @@ def search_customers():
     cur.execute("""
         SELECT
             id,
-            name,
-            mobile
+            customer AS name,
+            phone AS mobile
         FROM customers
-        WHERE name ILIKE %s
-           OR mobile ILIKE %s
-        ORDER BY name
+        WHERE customer ILIKE %s
+           OR phone ILIKE %s
+        ORDER BY customer
         LIMIT 10
     """, (f"%{q}%", f"%{q}%"))
 
