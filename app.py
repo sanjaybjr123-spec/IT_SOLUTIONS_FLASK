@@ -635,7 +635,10 @@ def search_customers():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT id, name, mobile
+        SELECT
+            id,
+            name,
+            mobile
         FROM customers
         WHERE name ILIKE %s
            OR mobile ILIKE %s
@@ -646,8 +649,8 @@ def search_customers():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-
     return jsonify(rows)
+ 
 
 @app.post("/api/customers")
 @login_required
