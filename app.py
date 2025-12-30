@@ -134,6 +134,28 @@ def init_db():
     except Exception as e:
         print("DB init skipped:", e)
 
+# ---- CUSTOMERS ----
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS customers(
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            mobile TEXT UNIQUE,
+            address TEXT
+        )
+        """)
+
+        # ---- LEDGER ----
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ledger(
+            id SERIAL PRIMARY KEY,
+            customer_id INTEGER,
+            entry_date TEXT,
+            remark TEXT,
+            dr REAL DEFAULT 0,
+            cr REAL DEFAULT 0
+        )
+        """)
+
 init_db()
         
         
@@ -599,6 +621,80 @@ def print_receipt(eid):
     return render_template("receipt.html", e=row_to_obj(r),
         shop={"name":"IT SOLUTIONS","addr":"GHATSILA COLLEGE ROAD"}
     )
+@app.get("/api/customers")
+@login_required
+def search_customers():
+    q = request.args.get("q", "")
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT * FROM customers
+        WHERE name ILIKE %s OR mobile ILIKE %s
+        ORDER BY name
+    """, (f"%{q}%", f"%{q}%"))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return jsonify(rows)
+
+@app.post("/api/customers")
+@login_required
+def add_customer():
+    d = request.get_json(force=True)
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("SELECT id FROM customers WHERE mobile=%s", (d["mobile"],))
+    if cur.fetchone():
+        return jsonify({"error": "Customer already exists"}), 400
+
+    cur.execute("""
+        INSERT INTO customers(name, mobile, address)
+        VALUES(%s, %s, %s)
+    """, (d["name"], d["mobile"], d.get("address", "")))
+    conn.commit()
+    cur.close(); conn.close()
+    return jsonify({"ok": True})
+
+@app.get("/api/ledger/<int:cid>")
+@login_required
+def get_ledger(cid):
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT * FROM ledger
+        WHERE customer_id=%s
+        ORDER BY entry_date
+    """, (cid,))
+    rows = cur.fetchall()
+
+    cur.execute("""
+        SELECT COALESCE(SUM(cr),0)-COALESCE(SUM(dr),0) bal
+        FROM ledger WHERE customer_id=%s
+    """, (cid,))
+    bal = cur.fetchone()["bal"]
+
+    cur.close(); conn.close()
+    return jsonify({"rows": rows, "balance": bal})
+
+@app.post("/api/ledger")
+@login_required
+def add_ledger():
+    d = request.get_json(force=True)
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO ledger(customer_id, entry_date, remark, dr, cr)
+        VALUES(%s, %s, %s, %s, %s)
+    """, (
+        d["customer_id"],
+        d["date"],
+        d.get("remark", ""),
+        d.get("dr", 0),
+        d.get("cr", 0)
+    ))
+    conn.commit()
+    cur.close(); conn.close()
+    return jsonify({"ok": True})
+
+@app.route("/ledger")
+@login_required
+def ledger_page():
+    return render_template("ledger.html")
 
 
 # ================= RUN =================
