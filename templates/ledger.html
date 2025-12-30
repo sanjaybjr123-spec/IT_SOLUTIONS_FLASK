@@ -1,95 +1,74 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h4>📒 Ledger</h4>
+<h4 class="mb-3">📒 Ledger</h4>
 
-<!-- SEARCH CUSTOMER -->
-<input id="search" class="form-control mb-2"
- placeholder="Search customer by name / mobile">
-
-<div id="custList" class="list-group mb-3"></div>
-
-<!-- LEDGER SECTION -->
-<div id="ledgerBox" style="display:none">
-  <h6 id="custName"></h6>
-  <div class="mb-2 fw-bold">Balance: ₹ <span id="bal">0</span></div>
-
-  <button class="btn btn-primary mb-2" onclick="openEntry()">➕ Ledger Entry</button>
-
-  <table class="table table-sm table-bordered">
-    <thead>
-      <tr>
-        <th>Date</th><th>Remark</th><th>DR</th><th>CR</th>
-      </tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
+<div class="card p-3 mb-3">
+  <input id="search" class="form-control"
+         placeholder="Search customer by name / mobile"
+         onkeyup="searchCustomer()">
 </div>
 
-<!-- POPUP -->
-<div id="popup" class="card p-3" style="display:none">
-  <input id="ld_date" type="date" class="form-control mb-2">
-  <input id="ld_remark" class="form-control mb-2" placeholder="Remark">
-  <input id="ld_dr" type="number" class="form-control mb-2" placeholder="Debit">
-  <input id="ld_cr" type="number" class="form-control mb-2" placeholder="Credit">
-  <button class="btn btn-success" onclick="saveEntry()">💾 Save</button>
+<div id="results" class="list-group mb-4"></div>
+
+<hr>
+
+<div class="card p-3">
+  <h6>➕ Add New Customer</h6>
+
+  <input id="c_name" class="form-control mb-2" placeholder="Customer Name">
+  <input id="c_mobile" class="form-control mb-2" placeholder="Mobile No">
+  <input id="c_address" class="form-control mb-2" placeholder="Address">
+
+  <button class="btn btn-success" onclick="addCustomer()">
+    Add Customer
+  </button>
 </div>
 
 <script>
-let CID=0;
+async function searchCustomer(){
+  const q = search.value;
+  if(q.length < 2){
+    results.innerHTML = "";
+    return;
+  }
 
-search.oninput = async ()=>{
-  const r = await fetch("/api/customers?q="+search.value);
-  const d = await r.json();
-  custList.innerHTML="";
-  d.forEach(c=>{
-    custList.innerHTML+=`
-     <button class="list-group-item"
-      onclick="openLedger(${c.id},'${c.name}')">
-      ${c.name} (${c.mobile})
-     </button>`;
+  const r = await fetch(`/api/customers/search?q=${q}`);
+  const data = await r.json();
+
+  let html = "";
+  data.forEach(c=>{
+    html += `
+      <div class="list-group-item">
+        <b>${c.name}</b><br>
+        📞 ${c.mobile}<br>
+        🏠 ${c.address}
+      </div>
+    `;
   });
-};
 
-async function openLedger(id,name){
-  CID=id;
-  custName.innerText=name;
-  ledgerBox.style.display="block";
-
-  const r=await fetch("/api/ledger/"+id);
-  const d=await r.json();
-
-  bal.innerText=d.balance;
-  rows.innerHTML="";
-  d.rows.forEach(x=>{
-    rows.innerHTML+=`
-     <tr>
-      <td>${x.entry_date}</td>
-      <td>${x.remark}</td>
-      <td>${x.dr}</td>
-      <td>${x.cr}</td>
-     </tr>`;
-  });
+  results.innerHTML = html || "<div class='text-muted'>No customer found</div>";
 }
 
-function openEntry(){
-  popup.style.display="block";
-}
+async function addCustomer(){
+  if(!c_name.value || !c_mobile.value)
+    return alert("Name & Mobile required");
 
-async function saveEntry(){
-  await fetch("/api/ledger",{
+  await fetch("/api/customers",{
     method:"POST",
-    headers:{'Content-Type':'application/json'},
+    headers:{ "Content-Type":"application/json" },
     body:JSON.stringify({
-      customer_id:CID,
-      date:ld_date.value,
-      remark:ld_remark.value,
-      dr:+ld_dr.value||0,
-      cr:+ld_cr.value||0
+      name:c_name.value,
+      mobile:c_mobile.value,
+      address:c_address.value
     })
   });
-  popup.style.display="none";
-  openLedger(CID,custName.innerText);
+
+  c_name.value="";
+  c_mobile.value="";
+  c_address.value="";
+
+  alert("Customer added");
 }
 </script>
 
