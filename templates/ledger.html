@@ -1,42 +1,96 @@
-{% extends "base.html" %}{% block content %}
-<div class="row g-3">
-  <div class="col-md-4">
-    <div class="card p-3">
-      <h5>Ledger Entry</h5>
-      <form method="post">
-        <label class="form-label">Party</label><input name="party" class="form-control" required>
-        <label class="form-label mt-1">Type</label>
-        <select name="tx_type" class="form-select"><option value="credit">Credit (+)</option><option value="debit">Debit (-)</option></select>
-        <label class="form-label mt-1">Amount</label><input name="amount" type="number" step="0.01" class="form-control" required>
-        <label class="form-label mt-1">Note</label><input name="note" class="form-control">
-        <button class="btn btn-secondary mt-2 w-100">Save</button>
-      </form>
-    </div>
-  </div>
-  <div class="col-md-8">
-    <div class="card p-3">
-      <h5>Party Balances</h5>
-      <table class="table table-sm">
-        <thead class="table-secondary"><tr><th>#</th><th>Party</th><th>Balance (Cr - Dr)</th></tr></thead>
-        <tbody>
-          {% for p in parties %}
-          <tr><td>{{ loop.index }}</td><td>{{ p['party'] }}</td><td>{{ '%.2f'|format(p['bal']) }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <hr>
-      <h5>Recent Transactions</h5>
-      <div class="table-responsive">
-        <table class="table table-sm">
-          <thead class="table-light"><tr><th>#</th><th>Date/Time</th><th>Party</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead>
-          <tbody>
-            {% for r in rows %}
-            <tr><td>{{ loop.index }}</td><td>{{ r['tx_date'] }}</td><td>{{ r['party'] }}</td><td>{{ r['tx_type'] }}</td><td>{{ r['amount'] }}</td><td>{{ r['note'] }}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+{% extends "base.html" %}
+{% block content %}
+
+<h4>📒 Ledger</h4>
+
+<!-- SEARCH CUSTOMER -->
+<input id="search" class="form-control mb-2"
+ placeholder="Search customer by name / mobile">
+
+<div id="custList" class="list-group mb-3"></div>
+
+<!-- LEDGER SECTION -->
+<div id="ledgerBox" style="display:none">
+  <h6 id="custName"></h6>
+  <div class="mb-2 fw-bold">Balance: ₹ <span id="bal">0</span></div>
+
+  <button class="btn btn-primary mb-2" onclick="openEntry()">➕ Ledger Entry</button>
+
+  <table class="table table-sm table-bordered">
+    <thead>
+      <tr>
+        <th>Date</th><th>Remark</th><th>DR</th><th>CR</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
 </div>
+
+<!-- POPUP -->
+<div id="popup" class="card p-3" style="display:none">
+  <input id="ld_date" type="date" class="form-control mb-2">
+  <input id="ld_remark" class="form-control mb-2" placeholder="Remark">
+  <input id="ld_dr" type="number" class="form-control mb-2" placeholder="Debit">
+  <input id="ld_cr" type="number" class="form-control mb-2" placeholder="Credit">
+  <button class="btn btn-success" onclick="saveEntry()">💾 Save</button>
+</div>
+
+<script>
+let CID=0;
+
+search.oninput = async ()=>{
+  const r = await fetch("/api/customers?q="+search.value);
+  const d = await r.json();
+  custList.innerHTML="";
+  d.forEach(c=>{
+    custList.innerHTML+=`
+     <button class="list-group-item"
+      onclick="openLedger(${c.id},'${c.name}')">
+      ${c.name} (${c.mobile})
+     </button>`;
+  });
+};
+
+async function openLedger(id,name){
+  CID=id;
+  custName.innerText=name;
+  ledgerBox.style.display="block";
+
+  const r=await fetch("/api/ledger/"+id);
+  const d=await r.json();
+
+  bal.innerText=d.balance;
+  rows.innerHTML="";
+  d.rows.forEach(x=>{
+    rows.innerHTML+=`
+     <tr>
+      <td>${x.entry_date}</td>
+      <td>${x.remark}</td>
+      <td>${x.dr}</td>
+      <td>${x.cr}</td>
+     </tr>`;
+  });
+}
+
+function openEntry(){
+  popup.style.display="block";
+}
+
+async function saveEntry(){
+  await fetch("/api/ledger",{
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      customer_id:CID,
+      date:ld_date.value,
+      remark:ld_remark.value,
+      dr:+ld_dr.value||0,
+      cr:+ld_cr.value||0
+    })
+  });
+  popup.style.display="none";
+  openLedger(CID,custName.innerText);
+}
+</script>
+
 {% endblock %}
