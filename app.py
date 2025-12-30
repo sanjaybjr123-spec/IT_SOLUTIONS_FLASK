@@ -661,6 +661,24 @@ def search_customers():
 
     return jsonify(rows)
 
+@app.post("/api/customers")
+@login_required
+def add_customer():
+    d = request.get_json(force=True)
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO customers(name, mobile, address)
+        VALUES(%s,%s,%s)
+        ON CONFLICT (mobile) DO NOTHING
+    """, (d["name"], d["mobile"], d["address"]))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({"ok": True})
+
     
 
 @app.get("/api/ledger/<int:cid>")
