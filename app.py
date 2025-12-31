@@ -627,7 +627,7 @@ def print_receipt(eid):
 @app.get("/api/customers/search")
 @login_required
 def search_customers():
-    q = request.args.get("q","").strip()
+    q = request.args.get("q", "").strip()
     if not q:
         return jsonify([])
 
@@ -637,12 +637,12 @@ def search_customers():
     cur.execute("""
         SELECT
             id,
-            customer AS name,
-            phone AS mobile
+            name,
+            mobile
         FROM customers
-        WHERE customer ILIKE %s
-           OR phone ILIKE %s
-        ORDER BY customer
+        WHERE name ILIKE %s
+           OR mobile ILIKE %s
+        ORDER BY name
         LIMIT 10
     """, (f"%{q}%", f"%{q}%"))
 
