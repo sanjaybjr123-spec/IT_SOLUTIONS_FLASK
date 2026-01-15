@@ -14,7 +14,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
 def now():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# ================= AUTH HELPERS =================
+# ================= AUTH HELPERS ================
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
