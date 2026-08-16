@@ -78,6 +78,11 @@ def init_db():
             bill_json TEXT
         )
         """)
+        # ---- ADD PRIORITY COLUMN IF NOT EXISTS ----
+        cur.execute("""
+            ALTER TABLE entries
+            ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'Regular'
+        """)
 
         # ---- SALES ----
         cur.execute("""
@@ -204,6 +209,7 @@ def row_to_obj(r):
         "phone": r["phone"],
         "model": r["model"],
         "problem": r["problem"],
+        "priority": r["priority"] or "Regular",
         "receive_date": r["receive_date"],
         "out_date": r["out_date"],
         "in_date": r["in_date"],
@@ -347,25 +353,27 @@ def add_entry():
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO entries(
-            type,
-            customer,
-            phone,
-            model,
-            problem,
-            receive_date,
-            status
-        )
-        VALUES(%s,%s,%s,%s,%s,%s,%s)
-    """, (
-        d.get("type", ""),
-        d.get("customer", ""),
-        d.get("phone", ""),
-        d.get("model", ""),
-        d.get("problem", ""),
+    INSERT INTO entries(
+        type,
+        customer,
+        phone,
+        model,
+        problem,
+        priority,
         receive_date,
-        "Received"
-    ))
+        status
+    )
+    VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+""", (
+    d.get("type", ""),
+    d.get("customer", ""),
+    d.get("phone", ""),
+    d.get("model", ""),
+    d.get("problem", ""),
+    d.get("priority", "Regular"),
+    receive_date,
+    "Received"
+))
 
     conn.commit()
     cur.close()
