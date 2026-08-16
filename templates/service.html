@@ -7,15 +7,18 @@
       <h4 class="mb-0">New Device Entry</h4>
       <small>GHATSILA COLLEGE ROAD</small>
     </div>
+
     <div class="d-flex gap-2">
       <input id="searchBox" class="form-control form-control-sm" placeholder="🔍 Search...">
       <a href="/overdue" class="btn btn-warning btn-sm">Overdue List</a>
       <button id="refreshBtn" class="btn btn-outline-secondary btn-sm">Refresh</button>
     </div>
   </div>
+
   <hr>
 
   <div class="row g-2">
+
     <div class="col-md-3">
       <label class="form-label">Type</label>
       <select id="type" class="form-select">
@@ -24,53 +27,86 @@
         <option>Other</option>
       </select>
     </div>
+
     <div class="col-md-3">
       <label class="form-label">Customer</label>
       <input id="customer" class="form-control">
     </div>
+
     <div class="col-md-3">
       <label class="form-label">Phone</label>
       <input id="phone" class="form-control">
     </div>
+
     <div class="col-md-3">
       <label class="form-label">Model / Serial</label>
       <input id="model" class="form-control">
     </div>
+
+    <!-- PRIORITY -->
+    <div class="col-md-3">
+      <label class="form-label">Priority</label>
+      <select id="priority" class="form-select">
+        <option value="Regular">🟢 Regular</option>
+        <option value="Rework">🔵 Rework</option>
+        <option value="Urgent">🔴 Urgent</option>
+      </select>
+    </div>
+
     <div class="col-12">
       <label class="form-label">Problem</label>
       <textarea id="problem" class="form-control" rows="2"></textarea>
     </div>
+
     <div class="col-md-4">
-  <label class="form-label">Receive Date</label>
-  <input id="receive_date" type="datetime-local" class="form-control">
-</div>
+      <label class="form-label">Receive Date</label>
+      <input id="receive_date" type="datetime-local" class="form-control">
+    </div>
+
     <div class="col-md-2 d-flex align-items-end">
       <button id="saveBtn" class="btn btn-primary w-100">Save</button>
     </div>
+
   </div>
 </div>
 
+
 <div class="card p-3 mt-3">
   <h5>Device List</h5>
+
   <div class="table-responsive">
     <table class="table table-sm align-middle" id="tbl">
+
       <thead class="table-primary">
         <tr>
-          <th>#</th><th>Type</th><th>Customer</th><th>Phone</th>
-          <th>Model</th><th>Problem</th>
-          <th>Receive</th><th>Out</th><th>In</th><th>Return</th>
-          <th>Status</th><th>Actions</th>
+          <th>#</th>
+          <th>Type</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Model</th>
+          <th>Priority</th>
+          <th>Problem</th>
+          <th>Receive</th>
+          <th>Out</th>
+          <th>In</th>
+          <th>Return</th>
+          <th>Status</th>
+          <th>Actions</th>
         </tr>
       </thead>
+
       <tbody></tbody>
+
     </table>
   </div>
 </div>
 
-<!-- Bill Modal -->
+
+<!-- BILL MODAL -->
 <div id="billModal"
      style="display:none; position:fixed; inset:0;
             background:rgba(0,0,0,.6); z-index:9999;">
+
   <div style="background:#fff; max-width:500px; margin:12% auto;
               padding:15px; border-radius:6px;">
 
@@ -80,21 +116,26 @@
     <input id="parts" class="form-control">
 
     <div class="row g-2 mt-2">
+
       <div class="col">
         <label class="form-label">Parts Amount</label>
         <input id="parts_total" type="number" class="form-control">
       </div>
+
       <div class="col">
         <label class="form-label">Service Charge</label>
         <input id="service_charge" type="number" class="form-control">
       </div>
+
       <div class="col">
         <label class="form-label">Other</label>
         <input id="other" type="number" class="form-control">
       </div>
+
     </div>
 
     <label class="form-label mt-2">Payment Mode</label>
+
     <select id="payment_mode" class="form-select">
       <option>Cash</option>
       <option>UPI</option>
@@ -102,15 +143,22 @@
     </select>
 
     <div class="text-end mt-3">
-      <button class="btn btn-secondary btn-sm" onclick="closeBill()">Cancel</button>
-      <button class="btn btn-primary btn-sm" onclick="saveBill()">Save</button>
+      <button class="btn btn-secondary btn-sm"
+              onclick="closeBill()">Cancel</button>
+
+      <button class="btn btn-primary btn-sm"
+              onclick="saveBill()">Save</button>
     </div>
 
   </div>
 </div>
 
+
 <style>
-.overdue{background:#fee2e2!important}
+
+.overdue{
+  background:#fee2e2!important;
+}
 
 .badge-pill{
   display:inline-block;
@@ -119,6 +167,8 @@
   font-weight:700;
   color:#111;
 }
+
+/* STATUS */
 
 .b-received{
   background:#e5e7eb;
@@ -151,148 +201,516 @@
 }
 
 
-.modal-dialog {
-  margin: 12% auto;
+/* PRIORITY */
 
+.p-regular{
+  background:#bbf7d0;
+  color:#166534;
 }
+
+.p-rework{
+  background:#bfdbfe;
+  color:#1e40af;
+}
+
+.p-urgent{
+  background:#fecaca;
+  color:#991b1b;
+}
+
 </style>
+
 
 {% raw %}
 <script>
+
 function fmtBadge(s){
-  return s==='Received'?'badge-pill b-received':
-         s==='Ready'?'badge-pill b-ready':
-         s==='Delivered'?'badge-pill b-delivered':
-         s==='Rejected'?'badge-pill b-reject':
-         s==='In'?'badge-pill b-in':
-         s==='Out'?'badge-pill b-out':
+
+  return s==='Received' ? 'badge-pill b-received' :
+         s==='Ready' ? 'badge-pill b-ready' :
+         s==='Delivered' ? 'badge-pill b-delivered' :
+         s==='Rejected' ? 'badge-pill b-reject' :
+         s==='In' ? 'badge-pill b-in' :
+         s==='Out' ? 'badge-pill b-out' :
          'badge-pill b-received';
+
 }
 
-async function api(p,opt={}){const r=await fetch(p,opt);if(!r.ok)throw new Error(await r.text());return await r.json();}
+
+/* PRIORITY BADGE */
+
+function fmtPriority(p){
+
+  return p==='Urgent' ? 'badge-pill p-urgent' :
+         p==='Rework' ? 'badge-pill p-rework' :
+         'badge-pill p-regular';
+
+}
+
+
+async function api(p,opt={}){
+
+  const r=await fetch(p,opt);
+
+  if(!r.ok)
+    throw new Error(await r.text());
+
+  return await r.json();
+
+}
+
+
+/* INDIA TIME */
+
 function nowLocal(){
+
   const d = new Date();
+
   const offset = d.getTimezoneOffset();
-  const local = new Date(d.getTime() - offset * 60000);
+
+  const local = new Date(
+    d.getTime() - offset * 60000
+  );
+
   return local.toISOString().slice(0,16);
+
 }
 
-const recv = document.getElementById('saveBtn').onclick=async()=>{
+
+/* SAVE ENTRY */
+
+document.getElementById('saveBtn').onclick=async()=>{
+
   const d={
+
     type: type.value,
+
     customer: customer.value,
+
     phone: phone.value,
+
     model: model.value,
+
     problem: problem.value,
+
+    priority: priority.value,
+
     receive_date: receive_date.value
+
   };
 
+
   const r = await fetch('/api/entries',{
+
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+
+    headers:{
+      'Content-Type':'application/json'
+    },
+
     body:JSON.stringify(d)
+
   });
+
 
   if(!r.ok){
+
     alert('Entry save nahi hui');
+
     return;
+
   }
 
-  // Save ke baad form clear
+
+  /* FORM CLEAR */
+
   document.getElementById('customer').value = '';
+
   document.getElementById('phone').value = '';
+
   document.getElementById('model').value = '';
+
   document.getElementById('problem').value = '';
 
-  // Type default
+
+  /* PRIORITY RESET */
+
+  document.getElementById('priority').value = 'Regular';
+
+
+  /* TYPE RESET */
+
   document.getElementById('type').value = 'Laptop';
 
-  // Receive Date dobara current date/time
+
+  /* DATE RESET */
+
   document.getElementById('receive_date').value = nowLocal();
 
-  // List refresh
+
   load();
+
 };
 
-let ALL_ROWS=[]; let billForId=null;
-async function load(){ const rs=await api('/api/entries'); ALL_ROWS=rs; render(rs); }
+
+let ALL_ROWS=[];
+
+let billForId=null;
+
+
+/* LOAD */
+
+async function load(){
+
+  const rs=await api('/api/entries');
+
+  ALL_ROWS=rs;
+
+  render(rs);
+
+}
+
+
+/* RENDER */
 
 function render(rows){
-  const tb=document.querySelector('#tbl tbody'); tb.innerHTML='';
+
+  const tb=document.querySelector('#tbl tbody');
+
+  tb.innerHTML='';
+
+
   rows.forEach((r,i)=>{
+
     let od='';
-    if(r.status!=='Delivered' && r.receive_date){
-      const diff=(new Date()-new Date(r.receive_date))/(1000*60*60*24);
-      if(diff>10) od='overdue';
+
+
+    /*
+       OVERDUE RULE
+
+       Urgent = 1 day
+       Regular = 10 days
+       Rework = 10 days
+    */
+
+    if(
+      r.status!=='Delivered' &&
+      r.receive_date
+    ){
+
+      const receiveTime =
+        new Date(r.receive_date).getTime();
+
+      const nowTime =
+        new Date().getTime();
+
+      const diffDays =
+        (nowTime-receiveTime) /
+        (1000*60*60*24);
+
+
+      let limit = 10;
+
+
+      if(r.priority === 'Urgent'){
+        limit = 1;
+      }
+
+
+      if(diffDays >= limit){
+        od='overdue';
+      }
+
     }
-    const tr=document.createElement('tr'); tr.className=od;
+
+
+    const tr=document.createElement('tr');
+
+    tr.className=od;
+
+
     tr.innerHTML=`
+
 <td>${i+1}</td>
+
 <td>${r.type||''}</td>
+
 <td>${r.customer||''}</td>
+
 <td>${r.phone||''}</td>
+
 <td>${r.model||''}</td>
+
+
+<td>
+  <span class="${fmtPriority(r.priority||'Regular')}">
+    ${r.priority||'Regular'}
+  </span>
+</td>
+
+
 <td>${r.problem||''}</td>
+
 <td>${r.receive_date||''}</td>
+
 <td>${r.out_date||''}</td>
+
 <td>${r.in_date||''}</td>
+
 <td>${r.return_date||''}</td>
-<td><span class="${fmtBadge(r.status||'')}">${r.status||''}</span></td>
+
+
+<td>
+  <span class="${fmtBadge(r.status||'')}">
+    ${r.status||''}
+  </span>
+</td>
+
+
 <td class="text-nowrap">
-  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'out')">Out</button>
-  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'in')">In</button>
-  <button class="btn btn-sm btn-outline-secondary" onclick="act(${r.id},'ready')">Ready</button>
-  <button class="btn btn-sm btn-outline-secondary" onclick="confirmAct(${r.id},'delivered')">Delivered</button>
-  <button class="btn btn-sm btn-outline-danger" onclick="act(${r.id},'reject')">Reject</button>
-  <button class="btn btn-sm btn-outline-primary" onclick="openBill(${r.id})">Bill</button>
-  <button class="btn btn-sm btn-outline-primary" onclick="window.open('/print/${r.id}','_blank')">Print</button>
 
-  ${r.status === 'Delivered' && r.whatsapp ? `
-    <a href="${r.whatsapp}" target="_blank" class="btn btn-sm btn-success">📲 WhatsApp</a>
-  ` : ''}
+  <button
+    class="btn btn-sm btn-outline-secondary"
+    onclick="confirmAct(${r.id},'out')">
+    Out
+  </button>
 
-  <button class="btn btn-sm btn-outline-dark" onclick="delE(${r.id})">Delete</button>
-</td>`;
+  <button
+    class="btn btn-sm btn-outline-secondary"
+    onclick="confirmAct(${r.id},'in')">
+    In
+  </button>
+
+  <button
+    class="btn btn-sm btn-outline-secondary"
+    onclick="act(${r.id},'ready')">
+    Ready
+  </button>
+
+  <button
+    class="btn btn-sm btn-outline-secondary"
+    onclick="confirmAct(${r.id},'delivered')">
+    Delivered
+  </button>
+
+  <button
+    class="btn btn-sm btn-outline-danger"
+    onclick="act(${r.id},'reject')">
+    Reject
+  </button>
+
+  <button
+    class="btn btn-sm btn-outline-primary"
+    onclick="openBill(${r.id})">
+    Bill
+  </button>
+
+  <button
+    class="btn btn-sm btn-outline-primary"
+    onclick="window.open('/print/${r.id}','_blank')">
+    Print
+  </button>
+
+
+  ${
+    r.status === 'Delivered' && r.whatsapp
+    ?
+    `
+    <a
+      href="${r.whatsapp}"
+      target="_blank"
+      class="btn btn-sm btn-success">
+      📲 WhatsApp
+    </a>
+    `
+    :
+    ''
+  }
+
+
+  <button
+    class="btn btn-sm btn-outline-dark"
+    onclick="delE(${r.id})">
+    Delete
+  </button>
+
+</td>
+
+`;
+
+
     tb.appendChild(tr);
+
   });
+
 }
 
-document.getElementById('searchBox').addEventListener('input',e=>{
+
+/* SEARCH */
+
+document.getElementById('searchBox')
+.addEventListener('input',e=>{
+
   const t=e.target.value.toLowerCase();
-  render(ALL_ROWS.filter(r=>Object.values(r).some(v=>String(v||'').toLowerCase().includes(t))));
+
+  render(
+
+    ALL_ROWS.filter(r=>
+
+      Object.values(r)
+      .some(v=>
+
+        String(v||'')
+        .toLowerCase()
+        .includes(t)
+
+      )
+
+    )
+
+  );
+
 });
-document.getElementById('refreshBtn').onclick=load;
+
+
+/* REFRESH */
+
+document.getElementById('refreshBtn')
+.onclick=load;
+
+
+/* CONFIRM */
 
 function confirmAct(id,action){
-  const label = action==='out'?'OUT': action==='in'?'IN':'DELIVERED';
-  if(confirm(`Mark as ${label}?`)) act(id,action);
+
+  const label =
+    action==='out' ? 'OUT' :
+    action==='in' ? 'IN' :
+    'DELIVERED';
+
+
+  if(confirm(`Mark as ${label}?`))
+    act(id,action);
+
 }
+
+
+/* ACTION */
+
 async function act(id,action){
-  await fetch(`/api/entries/${id}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});
+
+  await fetch(
+    `/api/entries/${id}/action`,
+    {
+      method:'POST',
+
+      headers:{
+        'Content-Type':'application/json'
+      },
+
+      body:JSON.stringify({
+        action
+      })
+
+    }
+  );
+
   load();
+
 }
+
+
+/* DELETE */
+
 async function delE(id){
+
   if(confirm('Delete this record?')){
-    await fetch(`/api/entries/${id}`,{method:'DELETE'});
+
+    await fetch(
+      `/api/entries/${id}`,
+      {
+        method:'DELETE'
+      }
+    );
+
     load();
+
   }
+
 }
+
+
+/* BILL */
 
 function openBill(id){
-  billForId = id;
-  document.getElementById('billModal').style.display = 'block';
+
+  billForId=id;
+
+  document.getElementById(
+    'billModal'
+  ).style.display='block';
+
 }
+
 
 function closeBill(){
-  document.getElementById('billModal').style.display = 'none';
-}
-async function saveBill(){
-  const d={parts:parts.value,parts_total:parts_total.value,service_charge:service_charge.value,other:other.value,payment_mode:payment_mode.value};
-  await fetch(`/api/entries/${billForId}/bill`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
-  closeBill(); load();
+
+  document.getElementById(
+    'billModal'
+  ).style.display='none';
+
 }
 
+
+async function saveBill(){
+
+  const d={
+
+    parts:parts.value,
+
+    parts_total:parts_total.value,
+
+    service_charge:
+      service_charge.value,
+
+    other:other.value,
+
+    payment_mode:
+      payment_mode.value
+
+  };
+
+
+  await fetch(
+    `/api/entries/${billForId}/bill`,
+    {
+      method:'POST',
+
+      headers:{
+        'Content-Type':'application/json'
+      },
+
+      body:JSON.stringify(d)
+
+    }
+  );
+
+
+  closeBill();
+
+  load();
+
+}
+
+
+/* INITIAL LOAD */
+
+document.getElementById(
+  'receive_date'
+).value=nowLocal();
+
 load();
+
 </script>
 {% endraw %}
 
