@@ -41,9 +41,9 @@
       <textarea id="problem" class="form-control" rows="2"></textarea>
     </div>
     <div class="col-md-4">
-      <label class="form-label">Receive Date (auto)</label>
-      <input id="receive_date" class="form-control" disabled>
-    </div>
+  <label class="form-label">Receive Date</label>
+  <input id="receive_date" type="datetime-local" class="form-control">
+</div>
     <div class="col-md-2 d-flex align-items-end">
       <button id="saveBtn" class="btn btn-primary w-100">Save</button>
     </div>
@@ -136,12 +136,27 @@ function fmtBadge(s){
 }
 
 async function api(p,opt={}){const r=await fetch(p,opt);if(!r.ok)throw new Error(await r.text());return await r.json();}
-function now(){return new Date().toLocaleString();}
-const recv=document.getElementById('receive_date');
-recv.value=now(); setInterval(()=>recv.value=now(),60000);
+function nowLocal(){
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - offset * 60000);
+  return local.toISOString().slice(0,16);
+}
+
+const recv = document.getElementById('receive_date');
+
+// Default में current date/time
+recv.value = nowLocal();
 
 document.getElementById('saveBtn').onclick=async()=>{
-  const d={type:type.value,customer:customer.value,phone:phone.value,model:model.value,problem:problem.value};
+  const d={
+  type: type.value,
+  customer: customer.value,
+  phone: phone.value,
+  model: model.value,
+  problem: problem.value,
+  receive_date: receive_date.value
+};
   await fetch('/api/entries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   load();
 };
