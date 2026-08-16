@@ -321,19 +321,54 @@ def list_entries():
 @login_required
 def add_entry():
     d = request.get_json(force=True)
+
+    # Frontend se manual Receive Date aaye to wahi use hoga
+    receive_date = d.get("receive_date", "").strip()
+
+    if receive_date:
+        try:
+            # datetime-local format:
+            # 2026-08-16T19:30
+            dt = datetime.datetime.fromisoformat(receive_date)
+            receive_date = dt.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return jsonify({"error": "Invalid receive date"}), 400
+    else:
+        # Agar date blank hai to current date/time
+        receive_date = now()
+
     conn = get_db()
     cur = conn.cursor()
+
     cur.execute("""
-        INSERT INTO entries(type,customer,phone,model,problem,receive_date,status)
+        INSERT INTO entries(
+            type,
+            customer,
+            phone,
+            model,
+            problem,
+            receive_date,
+            status
+        )
         VALUES(%s,%s,%s,%s,%s,%s,%s)
     """, (
-        d.get("type",""), d.get("customer",""), d.get("phone",""),
-        d.get("model",""), d.get("problem",""), now(), "Received"
+        d.get("type", ""),
+        d.get("customer", ""),
+        d.get("phone", ""),
+        d.get("model", ""),
+        d.get("problem", ""),
+        receive_date,
+        "Received"
     ))
+
     conn.commit()
     cur.close()
     conn.close()
-    return jsonify({"ok":True})
+
+    return jsonify({
+        "ok": True,
+        "receive_date": receive_date
+    })
 
 # ================= ENTRY ACTION =================
 @app.post("/api/entries/<int:eid>/action")
