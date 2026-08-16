@@ -143,21 +143,40 @@ function nowLocal(){
   return local.toISOString().slice(0,16);
 }
 
-const recv = document.getElementById('receive_date');
-
-// Default में current date/time
-recv.value = nowLocal();
-
-document.getElementById('saveBtn').onclick=async()=>{
+const recv = document.getElementById('saveBtn').onclick=async()=>{
   const d={
-  type: type.value,
-  customer: customer.value,
-  phone: phone.value,
-  model: model.value,
-  problem: problem.value,
-  receive_date: receive_date.value
-};
-  await fetch('/api/entries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+    type: type.value,
+    customer: customer.value,
+    phone: phone.value,
+    model: model.value,
+    problem: problem.value,
+    receive_date: receive_date.value
+  };
+
+  const r = await fetch('/api/entries',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(d)
+  });
+
+  if(!r.ok){
+    alert('Entry save nahi hui');
+    return;
+  }
+
+  // Save ke baad form clear
+  document.getElementById('customer').value = '';
+  document.getElementById('phone').value = '';
+  document.getElementById('model').value = '';
+  document.getElementById('problem').value = '';
+
+  // Type default
+  document.getElementById('type').value = 'Laptop';
+
+  // Receive Date dobara current date/time
+  document.getElementById('receive_date').value = nowLocal();
+
+  // List refresh
   load();
 };
 
