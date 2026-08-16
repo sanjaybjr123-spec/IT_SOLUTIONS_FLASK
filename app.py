@@ -428,19 +428,62 @@ def save_bill(eid):
     return jsonify({"ok":True})
 
 # ================= OVERDUE =================
-@app.route("/overdue")
-@login_required
-def overdue_page():
-    return render_template("overdue.html")
-
 @app.get("/api/overdue")
 @login_required
 def overdue_list():
-    conn=get_db();cur=conn.cursor()
-    d=(now_ist()-datetime.timedelta(days=10)).strftime("%Y-%m-%d")
-    cur.execute("SELECT * FROM entries WHERE status!='Delivered' AND receive_date<%s",(d,))
-    r=cur.fetchall();cur.close();conn.close()
-    return jsonify([row_to_obj(x) for x in r])
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT *
+        FROM entries
+        WHERE status != 'Delivered'
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    overdue_rows = []
+
+    current_time = now_ist()
+
+    for r in rows:
+
+        if not r["receive_date"]:
+            continue
+
+        try:
+            receive_time = datetime.datetime.strptime(
+                r["receive_date"],
+                "%Y-%m-%d %H:%M:%S"
+            ).replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+
+        except ValueError:
+            continue
+
+        age = current_time - receive_time
+
+        # 🔴 URGENT = 24 HOURS
+        if (r["priority"] or "Regular") == "Urgent":
+            overdue_limit = datetime.timedelta(hours=24)
+
+        # 🟢 REGULAR = 10 DAYS
+        elif (r["priority"] or "Regular") == "Regular":
+            overdue_limit = datetime.timedelta(days=10)
+
+        # 🔵 REWORK = 10 DAYS
+        elif (r["priority"] or "Regular") == "Rework":
+            overdue_limit = datetime.timedelta(days=10)
+
+        else:
+            overdue_limit = datetime.timedelta(days=10)
+
+        if age >= overdue_limit:
+            overdue_rows.append(row_to_obj(r))
+
+    return jsonify(overdue_rows)
 
 # ================= EXPORT =================
 @app.get("/export/entries")
