@@ -438,6 +438,7 @@ def overdue_list():
         SELECT *
         FROM entries
         WHERE status != 'Delivered'
+        ORDER BY id DESC
     """)
 
     rows = cur.fetchall()
@@ -445,9 +446,8 @@ def overdue_list():
     cur.close()
     conn.close()
 
-    overdue_rows = []
-
     current_time = now_ist()
+    overdue_rows = []
 
     for r in rows:
 
@@ -455,32 +455,38 @@ def overdue_list():
             continue
 
         try:
+            # Database me saved IST time
             receive_time = datetime.datetime.strptime(
                 r["receive_date"],
                 "%Y-%m-%d %H:%M:%S"
-            ).replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            )
 
-        except ValueError:
+            # IST timezone attach
+            receive_time = receive_time.replace(
+                tzinfo=ZoneInfo("Asia/Kolkata")
+            )
+
+        except Exception:
             continue
 
         age = current_time - receive_time
 
-        # 🔴 URGENT = 24 HOURS
-        if (r["priority"] or "Regular") == "Urgent":
-            overdue_limit = datetime.timedelta(hours=24)
+        priority = (r["priority"] or "Regular").strip()
 
-        # 🟢 REGULAR = 10 DAYS
-        elif (r["priority"] or "Regular") == "Regular":
-            overdue_limit = datetime.timedelta(days=10)
+        # ================= OVERDUE LIMIT =================
 
-        # 🔵 REWORK = 10 DAYS
-        elif (r["priority"] or "Regular") == "Rework":
-            overdue_limit = datetime.timedelta(days=10)
+        if priority == "Urgent":
+            limit = datetime.timedelta(hours=24)
+
+        elif priority == "Rework":
+            limit = datetime.timedelta(days=10)
 
         else:
-            overdue_limit = datetime.timedelta(days=10)
+            limit = datetime.timedelta(days=10)
 
-        if age >= overdue_limit:
+        # ================= CHECK =================
+
+        if age >= limit:
             overdue_rows.append(row_to_obj(r))
 
     return jsonify(overdue_rows)
