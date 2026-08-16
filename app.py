@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, abort, Response, session, redirect, url_for
 import os, json, datetime, csv
+from zoneinfo import ZoneInfo
 from io import StringIO
 import psycopg2
 import psycopg2.extras
@@ -12,7 +13,12 @@ app = Flask(__name__, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret")
 
 def now():
-    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.datetime.now(
+        ZoneInfo("Asia/Kolkata")
+    ).strftime("%Y-%m-%d %H:%M:%S")
+
+def now_ist():
+    return datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
 
 # ================= AUTH HELPERS ================
 def login_required(fn):
@@ -219,7 +225,7 @@ def dashboard():
     conn = get_db()
     cur = conn.cursor()
 
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    today = now_ist().strftime("%Y-%m-%d")
 
     cur.execute("SELECT COALESCE(SUM(amount),0) s FROM sales WHERE sale_date LIKE %s", (today+"%",))
     today_sales = cur.fetchone()["s"]
@@ -227,7 +233,7 @@ def dashboard():
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
 
-    ten_days_ago = (datetime.datetime.now()-datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+    ten_days_ago = (now_ist()-datetime.timedelta(days=10)).strftime("%Y-%m-%d")
     cur.execute("""
         SELECT COUNT(*) n FROM entries
         WHERE status!='Delivered' AND receive_date < %s
@@ -423,7 +429,7 @@ def overdue_page():
 @login_required
 def overdue_list():
     conn=get_db();cur=conn.cursor()
-    d=(datetime.datetime.now()-datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+    d=(now_ist()-datetime.timedelta(days=10)).strftime("%Y-%m-%d")
     cur.execute("SELECT * FROM entries WHERE status!='Delivered' AND receive_date<%s",(d,))
     r=cur.fetchall();cur.close();conn.close()
     return jsonify([row_to_obj(x) for x in r])
