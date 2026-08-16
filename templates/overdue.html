@@ -2,51 +2,217 @@
 {% block content %}
 
 <div class="card p-3">
-  <h5>Overdue Device List (&gt; 10 Days)</h5>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h5 class="mb-1">Overdue Device List</h5>
+      <small class="text-muted">
+        Urgent: 24 Hours | Regular: 10 Days | Rework: 10 Days
+      </small>
+    </div>
+
+    <button class="btn btn-outline-secondary btn-sm"
+            onclick="loadOverdue()">
+      🔄 Refresh
+    </button>
+  </div>
 
   <div class="table-responsive">
-    <table class="table table-sm" id="tbl">
+
+    <table class="table table-sm table-hover align-middle" id="tbl">
+
       <thead class="table-warning">
+
         <tr>
           <th>#</th>
           <th>Customer</th>
           <th>Phone</th>
           <th>Model</th>
+          <th>Priority</th>
           <th>Receive Date</th>
           <th>Status</th>
         </tr>
+
       </thead>
+
       <tbody></tbody>
+
     </table>
+
   </div>
+
+  <div id="noData"
+       class="text-center text-muted py-4"
+       style="display:none;">
+    ✅ अभी कोई overdue device नहीं है
+  </div>
+
 </div>
 
-<script>
-async function loadOverdue(){
-  try{
-    const r = await fetch("/api/overdue");
-    const data = await r.json();
 
-    const tb = document.querySelector("#tbl tbody");
-    tb.innerHTML = "";
+<style>
 
-    data.forEach((r,i)=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${i+1}</td>
-        <td>${r.customer}</td>
-        <td>${r.phone}</td>
-        <td>${r.model}</td>
-        <td>${r.receive_date}</td>
-        <td><span class="badge bg-danger">${r.status}</span></td>
-      `;
-      tb.appendChild(tr);
-    });
-  }catch(e){
-    alert("Failed to load overdue list");
-  }
+.priority-badge{
+  display:inline-block;
+  padding:5px 10px;
+  border-radius:999px;
+  font-weight:700;
+  font-size:12px;
 }
+
+.priority-urgent{
+  background:#fecaca;
+  color:#991b1b;
+}
+
+.priority-regular{
+  background:#bbf7d0;
+  color:#166534;
+}
+
+.priority-rework{
+  background:#bfdbfe;
+  color:#1e40af;
+}
+
+.status-badge{
+  display:inline-block;
+  padding:5px 10px;
+  border-radius:999px;
+  background:#fca5a5;
+  color:#991b1b;
+  font-weight:700;
+  font-size:12px;
+}
+
+</style>
+
+
+<script>
+
+async function loadOverdue(){
+
+  try{
+
+    const response = await fetch("/api/overdue");
+
+    if(!response.ok){
+      throw new Error("API Error");
+    }
+
+    const data = await response.json();
+
+    const tbody = document.querySelector("#tbl tbody");
+
+    const noData = document.querySelector("#noData");
+
+    tbody.innerHTML = "";
+
+    /*
+      Agar koi overdue device nahi hai
+    */
+
+    if(!data || data.length === 0){
+
+      noData.style.display = "block";
+
+      return;
+
+    }
+
+    noData.style.display = "none";
+
+
+    /*
+      Device rows
+    */
+
+    data.forEach((r,index)=>{
+
+      const priority = r.priority || "Regular";
+
+      let priorityClass = "priority-regular";
+
+
+      if(priority === "Urgent"){
+
+        priorityClass = "priority-urgent";
+
+      }
+
+      else if(priority === "Rework"){
+
+        priorityClass = "priority-rework";
+
+      }
+
+
+      const tr = document.createElement("tr");
+
+
+      tr.innerHTML = `
+
+        <td>
+          ${index + 1}
+        </td>
+
+        <td>
+          <strong>${r.customer || ""}</strong>
+        </td>
+
+        <td>
+          ${r.phone || ""}
+        </td>
+
+        <td>
+          ${r.model || ""}
+        </td>
+
+        <td>
+
+          <span class="priority-badge ${priorityClass}">
+            ${priority}
+          </span>
+
+        </td>
+
+        <td>
+          ${r.receive_date || ""}
+        </td>
+
+        <td>
+
+          <span class="status-badge">
+            ${r.status || ""}
+          </span>
+
+        </td>
+
+      `;
+
+      tbody.appendChild(tr);
+
+    });
+
+  }
+
+  catch(error){
+
+    console.error("Overdue Error:",error);
+
+    alert("Overdue list load nahi ho pa rahi hai.");
+
+  }
+
+}
+
+
+/*
+  Page open hote hi load
+*/
+
 loadOverdue();
+
 </script>
 
 {% endblock %}
