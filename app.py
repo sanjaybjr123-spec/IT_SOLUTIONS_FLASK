@@ -428,9 +428,19 @@ def save_bill(eid):
     return jsonify({"ok":True})
 
 # ================= OVERDUE =================
+
+# Overdue Page
+@app.route("/overdue")
+@login_required
+def overdue_page():
+    return render_template("overdue.html")
+
+
+# Overdue API
 @app.get("/api/overdue")
 @login_required
 def overdue_list():
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -455,13 +465,11 @@ def overdue_list():
             continue
 
         try:
-            # Database me saved IST time
             receive_time = datetime.datetime.strptime(
                 r["receive_date"],
                 "%Y-%m-%d %H:%M:%S"
             )
 
-            # IST timezone attach
             receive_time = receive_time.replace(
                 tzinfo=ZoneInfo("Asia/Kolkata")
             )
@@ -473,18 +481,20 @@ def overdue_list():
 
         priority = (r["priority"] or "Regular").strip()
 
-        # ================= OVERDUE LIMIT =================
-
+        # 🔴 URGENT = 24 HOURS
         if priority == "Urgent":
             limit = datetime.timedelta(hours=24)
 
+        # 🟢 REGULAR = 10 DAYS
+        elif priority == "Regular":
+            limit = datetime.timedelta(days=10)
+
+        # 🔵 REWORK = 10 DAYS
         elif priority == "Rework":
             limit = datetime.timedelta(days=10)
 
         else:
             limit = datetime.timedelta(days=10)
-
-        # ================= CHECK =================
 
         if age >= limit:
             overdue_rows.append(row_to_obj(r))
