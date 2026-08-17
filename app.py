@@ -435,6 +435,144 @@ def overdue_whatsapp():
         "message": message,
         "whatsapp_url": whatsapp_url
     })
+
+# ================= OUT DEVICES =================
+
+@app.route("/out-devices")
+@login_required
+def out_devices_page():
+    return render_template("out_devices.html")
+
+
+@app.get("/api/out-devices")
+@login_required
+def out_devices_list():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT *
+        FROM entries
+        WHERE status = 'Out'
+        ORDER BY out_date DESC
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return jsonify([
+        row_to_obj(r)
+        for r in rows
+    ])
+
+
+# ================= WHATSAPP OUT LIST =================
+
+@app.get("/api/out-whatsapp")
+@login_required
+def out_whatsapp():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT *
+        FROM entries
+        WHERE status = 'Out'
+        ORDER BY out_date DESC
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    if not rows:
+        return jsonify({
+            "ok": False,
+            "message": "अभी कोई OUT device नहीं है।"
+        })
+
+    lines = []
+
+    lines.append("IT SOLUTIONS")
+    lines.append("GHATSILA COLLEGE ROAD")
+    lines.append("")
+    lines.append("⚠️ OUT DEVICE LIST")
+    lines.append("")
+
+    for i, r in enumerate(rows, 1):
+
+        priority = (r["priority"] or "Regular").strip()
+
+        if priority == "Urgent":
+            p_icon = "🔴"
+        elif priority == "Rework":
+            p_icon = "🔵"
+        else:
+            p_icon = "🟢"
+
+        lines.append(
+            f"{i}. Customer: {r['customer'] or '-'}"
+        )
+
+        lines.append(
+            f"   Mobile: {r['phone'] or '-'}"
+        )
+
+        lines.append(
+            f"   Device: {r['type'] or '-'}"
+        )
+
+        lines.append(
+            f"   Model: {r['model'] or '-'}"
+        )
+
+        lines.append(
+            f"   Problem: {r['problem'] or '-'}"
+        )
+
+        lines.append(
+            f"   Priority: {p_icon} {priority}"
+        )
+
+        lines.append(
+            f"   OUT Date: {r['out_date'] or '-'}"
+        )
+
+        lines.append(
+            f"   Status: {r['status'] or '-'}"
+        )
+
+        lines.append("")
+        lines.append("--------------------------")
+        lines.append("")
+
+    lines.append(
+        f"Total OUT Devices: {len(rows)}"
+    )
+
+    message = "\n".join(lines)
+
+    # WhatsApp number
+    whatsapp_number = "919113171781"
+
+    whatsapp_url = (
+        "https://wa.me/"
+        + whatsapp_number
+        + "?text="
+        + urllib.parse.quote(message)
+    )
+
+    return jsonify({
+        "ok": True,
+        "count": len(rows),
+        "message": message,
+        "whatsapp_url": whatsapp_url
+    })
 # ================= SERVICE =================
 @app.route("/service")
 @login_required
