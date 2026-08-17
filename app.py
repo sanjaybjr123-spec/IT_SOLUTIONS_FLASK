@@ -429,23 +429,81 @@ def add_entry():
 @app.post("/api/entries/<int:eid>/action")
 @login_required
 def entry_action(eid):
-    d = request.get_json(force=True)
-    t = now()
-    m = {
-        "out":("Out","out_date"),
-        "in":("In","in_date"),
-        "ready":("Ready","ready_date"),
-        "delivered":("Delivered","return_date"),
-        "reject":("Rejected","reject_date")
-    }
-    if d["action"] not in m:
-        return jsonify({"error":"invalid"}),400
 
-    status,col = m[d["action"]]
-    conn=get_db();cur=conn.cursor()
-    cur.execute(f"UPDATE entries SET status=%s,{col}=%s WHERE id=%s",(status,t,eid))
-    conn.commit();cur.close();conn.close()
-    return jsonify({"ok":True})
+    d = request.get_json(force=True)
+
+    action = d.get("action")
+
+    m = {
+        "out": ("Out", "out_date"),
+        "in": ("In", "in_date"),
+        "ready": ("Ready", "ready_date"),
+        "delivered": ("Delivered", "return_date"),
+        "reject": ("Rejected", "reject_date")
+    }
+
+    if action not in m:
+        return jsonify({"error": "invalid"}), 400
+
+    status, col = m[action]
+
+    # ================= DATE / TIME =================
+
+    manual_date = d.get("date", "").strip()
+
+    if manual_date:
+
+        try:
+
+            dt = datetime.datetime.fromisoformat(
+                manual_date
+            )
+
+            action_time = dt.strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+
+        except ValueError:
+
+            return jsonify({
+                "error": "Invalid date/time"
+            }), 400
+
+    else:
+
+        # Ready / Delivered / Reject
+        # ke liye current time
+
+        action_time = now()
+
+    # ================= UPDATE =================
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        f"""
+        UPDATE entries
+        SET status=%s, {col}=%s
+        WHERE id=%s
+        """,
+        (
+            status,
+            action_time,
+            eid
+        )
+    )
+
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "ok": True,
+        "status": status,
+        "date": action_time
+    })
 
 # ================= BILL =================
 @app.post("/api/entries/<int:eid>/bill")
