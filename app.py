@@ -344,6 +344,97 @@ def dashboard_warnings():
 
     return jsonify(warnings)
 
+# ================= WHATSAPP OVERDUE LIST =================
+
+@app.get("/api/overdue-whatsapp")
+@login_required
+def overdue_whatsapp():
+
+    rows = get_overdue_entries()
+
+    if not rows:
+        return jsonify({
+            "ok": False,
+            "message": "अभी कोई overdue device नहीं है।"
+        })
+
+    lines = []
+
+    lines.append("IT SOLUTIONS")
+    lines.append("GHATSILA COLLEGE ROAD")
+    lines.append("")
+    lines.append("⚠️ OVERDUE DEVICE LIST")
+    lines.append("")
+
+    for i, r in enumerate(rows, 1):
+
+        priority = (r["priority"] or "Regular").strip()
+
+        if priority == "Urgent":
+            p_icon = "🔴"
+        elif priority == "Rework":
+            p_icon = "🔵"
+        else:
+            p_icon = "🟢"
+
+        lines.append(
+            f"{i}. Customer: {r['customer'] or '-'}"
+        )
+
+        lines.append(
+            f"   Mobile: {r['phone'] or '-'}"
+        )
+
+        lines.append(
+            f"   Device: {r['type'] or '-'}"
+        )
+
+        lines.append(
+            f"   Model: {r['model'] or '-'}"
+        )
+
+        lines.append(
+            f"   Problem: {r['problem'] or '-'}"
+        )
+
+        lines.append(
+            f"   Priority: {p_icon} {priority}"
+        )
+
+        lines.append(
+            f"   Receive: {r['receive_date'] or '-'}"
+        )
+
+        lines.append(
+            f"   Status: {r['status'] or '-'}"
+        )
+
+        lines.append("")
+        lines.append("--------------------------")
+        lines.append("")
+
+    lines.append(
+        f"Total Overdue: {len(rows)}"
+    )
+
+    message = "\n".join(lines)
+
+    # Aapka WhatsApp number
+    whatsapp_number = "9113171781"
+
+    whatsapp_url = (
+        "https://wa.me/"
+        + whatsapp_number
+        + "?text="
+        + urllib.parse.quote(message)
+    )
+
+    return jsonify({
+        "ok": True,
+        "count": len(rows),
+        "message": message,
+        "whatsapp_url": whatsapp_url
+    })
 # ================= SERVICE =================
 @app.route("/service")
 @login_required
