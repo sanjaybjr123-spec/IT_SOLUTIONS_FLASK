@@ -76,6 +76,13 @@
       <a href="/overdue" class="btn btn-warning">
         View Overdue
       </a>
+
+      <button
+  type="button"
+  class="btn btn-success"
+  onclick="sendOverdueWhatsApp()">
+  📲 WhatsApp Overdue
+</button>
 <a href="/ink" class="ink-btn">INK STOCK MANAGEMENT</a>
 <style>
 .ink-btn{
@@ -250,4 +257,41 @@ async function loadInkDashboard(){
 loadInkDashboard();
 </script>
 
+<script>
+
+async function sendOverdueWhatsApp(){
+
+  try{
+
+    const response =
+      await fetch("/api/overdue-whatsapp");
+
+    const data =
+      await response.json();
+
+    if(!data.ok){
+
+      alert(data.message);
+
+      return;
+    }
+
+    // WhatsApp open
+    window.location.href =
+      data.whatsapp_url;
+
+  }
+  catch(error){
+
+    console.error(error);
+
+    alert(
+      "Overdue list WhatsApp par open nahi ho pa rahi hai."
+    );
+
+  }
+
+}
+
+</script>
 {% endblock %}
