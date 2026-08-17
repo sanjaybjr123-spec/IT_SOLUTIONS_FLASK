@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card p-3">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+
+    <div>
+      <h5 class="mb-1">📦 OUT Device List</h5>
+
+      <small class="text-muted">
+        दुकान से बाहर गए सभी devices
+      </small>
+    </div>
+
+    <div class="d-flex gap-2">
+
+      <button
+        class="btn btn-success btn-sm"
+        onclick="sendOutWhatsApp()">
+
+        📲 WhatsApp OUT List
+
+      </button>
+
+      <button
+        class="btn btn-outline-secondary btn-sm"
+        onclick="loadOutDevices()">
+
+        🔄 Refresh
+
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- COUNT -->
+
+  <div class="alert alert-warning">
+
+    <strong>
+      OUT Devices:
+    </strong>
+
+    <span id="outCount">
+      0
+    </span>
+
+  </div>
+
+
+  <div class="table-responsive">
+
+    <table class="table table-sm table-hover align-middle">
+
+      <thead class="table-warning">
+
+        <tr>
+
+          <th>#</th>
+          <th>Customer</th>
+          <th>Mobile</th>
+          <th>Device</th>
+          <th>Model</th>
+          <th>Problem</th>
+          <th>Priority</th>
+          <th>OUT Date</th>
+          <th>Status</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody id="outTable">
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+
+  <div
+    id="noOut"
+    class="text-center text-muted py-4"
+    style="display:none;">
+
+    ✅ अभी कोई device OUT नहीं है।
+
+  </div>
+
+</div>
+
+
+<style>
+
+.priority{
+
+  display:inline-block;
+
+  padding:5px 10px;
+
+  border-radius:999px;
+
+  font-size:12px;
+
+  font-weight:700;
+
+}
+
+.priority-regular{
+
+  background:#bbf7d0;
+
+  color:#166534;
+
+}
+
+.priority-rework{
+
+  background:#bfdbfe;
+
+  color:#1e40af;
+
+}
+
+.priority-urgent{
+
+  background:#fecaca;
+
+  color:#991b1b;
+
+}
+
+.out-status{
+
+  display:inline-block;
+
+  padding:5px 10px;
+
+  border-radius:999px;
+
+  background:#93c5fd;
+
+  color:#1e3a8a;
+
+  font-weight:700;
+
+  font-size:12px;
+
+}
+
+</style>
+
+
+<script>
+
+
+/* ================= LOAD OUT DEVICES ================= */
+
+async function loadOutDevices(){
+
+  try{
+
+    const response =
+      await fetch("/api/out-devices");
+
+    if(!response.ok){
+
+      throw new Error("API Error");
+
+    }
+
+    const data =
+      await response.json();
+
+
+    const table =
+      document.getElementById(
+        "outTable"
+      );
+
+    const noOut =
+      document.getElementById(
+        "noOut"
+      );
+
+    const count =
+      document.getElementById(
+        "outCount"
+      );
+
+
+    table.innerHTML = "";
+
+
+    count.innerText =
+      data.length;
+
+
+    if(data.length === 0){
+
+      noOut.style.display =
+        "block";
+
+      return;
+
+    }
+
+
+    noOut.style.display =
+      "none";
+
+
+    data.forEach((r,index)=>{
+
+      const priority =
+        r.priority || "Regular";
+
+
+      let priorityClass =
+        "priority-regular";
+
+
+      if(priority === "Urgent"){
+
+        priorityClass =
+          "priority-urgent";
+
+      }
+
+      else if(priority === "Rework"){
+
+        priorityClass =
+          "priority-rework";
+
+      }
+
+
+      const tr =
+        document.createElement("tr");
+
+
+      tr.innerHTML = `
+
+        <td>
+          ${index + 1}
+        </td>
+
+        <td>
+          <strong>
+            ${r.customer || ""}
+          </strong>
+        </td>
+
+        <td>
+          ${r.phone || ""}
+        </td>
+
+        <td>
+          ${r.type || ""}
+        </td>
+
+        <td>
+          ${r.model || ""}
+        </td>
+
+        <td>
+          ${r.problem || ""}
+        </td>
+
+        <td>
+
+          <span
+            class="priority ${priorityClass}">
+
+            ${priority}
+
+          </span>
+
+        </td>
+
+        <td>
+          ${r.out_date || ""}
+        </td>
+
+        <td>
+
+          <span class="out-status">
+
+            ${r.status || ""}
+
+          </span>
+
+        </td>
+
+      `;
+
+
+      table.appendChild(tr);
+
+    });
+
+  }
+
+  catch(error){
+
+    console.error(
+      "OUT Device Error:",
+      error
+    );
+
+    alert(
+      "OUT device list load nahi ho rahi hai."
+    );
+
+  }
+
+}
+
+
+/* ================= WHATSAPP ================= */
+
+async function sendOutWhatsApp(){
+
+  try{
+
+    const response =
+      await fetch(
+        "/api/out-whatsapp"
+      );
+
+
+    const data =
+      await response.json();
+
+
+    if(!data.ok){
+
+      alert(
+        data.message
+      );
+
+      return;
+
+    }
+
+
+    window.location.href =
+      data.whatsapp_url;
+
+  }
+
+  catch(error){
+
+    console.error(error);
+
+    alert(
+      "WhatsApp open nahi ho pa raha hai."
+    );
+
+  }
+
+}
+
+
+/* ================= INITIAL LOAD ================= */
+
+loadOutDevices();
+
+</script>
+
+{% endblock %}
