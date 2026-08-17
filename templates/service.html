@@ -754,15 +754,13 @@ function render(rows){
   <!-- DELIVERED -->
 
   <button
-    class="btn btn-sm btn-outline-secondary"
-    onclick="confirmAct(
-      ${r.id},
-      'delivered'
-    )">
-
-    Delivered
-
-  </button>
+  class="btn btn-sm btn-outline-secondary"
+  onclick="manualAction(
+    ${r.id},
+    'delivered'
+  )">
+  Delivered
+</button>
 
 
   <!-- REJECT -->
@@ -946,9 +944,11 @@ function manualAction(
 
 
   const title =
-    action==='out'
-    ? 'OUT Date & Time'
-    : 'IN Date & Time';
+  action === 'out'
+  ? 'OUT Date & Time'
+  : action === 'in'
+  ? 'IN Date & Time'
+  : 'DELIVERED Date & Time';
 
 
   document.getElementById(
