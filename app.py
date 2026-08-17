@@ -19,7 +19,53 @@ def now():
 
 def now_ist():
     return datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+def get_overdue_entries():
 
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT *
+        FROM entries
+        WHERE status != 'Delivered'
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    current_time = now_ist()
+    overdue_rows = []
+
+    for r in rows:
+
+        if not r["receive_date"]:
+            continue
+
+        try:
+            receive_time = datetime.datetime.strptime(
+                r["receive_date"],
+                "%Y-%m-%d %H:%M:%S"
+            ).replace(
+                tzinfo=ZoneInfo("Asia/Kolkata")
+            )
+        except:
+            continue
+
+        age = current_time - receive_time
+
+        priority = (r["priority"] or "Regular").strip()
+
+        if priority == "Urgent":
+            limit = datetime.timedelta(hours=24)
+        else:
+            limit = datetime.timedelta(days=10)
+
+        if age >= limit:
+            overdue_rows.append(r)
+
+    return overdue_rows
 # ================= AUTH HELPERS ================
 def login_required(fn):
     @wraps(fn)
@@ -239,12 +285,7 @@ def dashboard():
     cur.execute("SELECT COUNT(*) n FROM entries WHERE status!='Delivered'")
     pending = cur.fetchone()["n"]
 
-    ten_days_ago = (now_ist()-datetime.timedelta(days=10)).strftime("%Y-%m-%d")
-    cur.execute("""
-        SELECT COUNT(*) n FROM entries
-        WHERE status!='Delivered' AND receive_date < %s
-    """, (ten_days_ago,))
-    overdue = cur.fetchone()["n"]
+    overdue = len(get_overdue_entries())
 
     cur.close()
     conn.close()
@@ -441,65 +482,15 @@ def overdue_page():
 @login_required
 def overdue_list():
 
-    conn = get_db()
-    cur = conn.cursor()
+    rows = get_overdue_entries()
 
-    cur.execute("""
-        SELECT *
-        FROM entries
-        WHERE status != 'Delivered'
-        ORDER BY id DESC
-    """)
+    return jsonify([
+        row_to_obj(r)
+        for r in rows
+    ])
 
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
-
-    current_time = now_ist()
-    overdue_rows = []
-
-    for r in rows:
-
-        if not r["receive_date"]:
-            continue
-
-        try:
-            receive_time = datetime.datetime.strptime(
-                r["receive_date"],
-                "%Y-%m-%d %H:%M:%S"
-            )
-
-            receive_time = receive_time.replace(
-                tzinfo=ZoneInfo("Asia/Kolkata")
-            )
-
-        except Exception:
-            continue
-
-        age = current_time - receive_time
-
-        priority = (r["priority"] or "Regular").strip()
-
-        # 🔴 URGENT = 24 HOURS
-        if priority == "Urgent":
-            limit = datetime.timedelta(hours=24)
-
-        # 🟢 REGULAR = 10 DAYS
-        elif priority == "Regular":
-            limit = datetime.timedelta(days=10)
-
-        # 🔵 REWORK = 10 DAYS
-        elif priority == "Rework":
-            limit = datetime.timedelta(days=10)
-
-        else:
-            limit = datetime.timedelta(days=10)
-
-        if age >= limit:
-            overdue_rows.append(row_to_obj(r))
-
-    return jsonify(overdue_rows)
+            
+        
 
 # ================= EXPORT =================
 @app.get("/export/entries")
